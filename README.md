@@ -12,6 +12,7 @@ skills/public/angel-copilot
 ```
 
 If your Claude Code setup expects skills to live in a specific directory, you can also copy the folder there.
+If you prefer the Claude UI upload flow, use the packaged `angel-copilot.skill` file in the repo root.
 
 ## Use
 
@@ -31,7 +32,9 @@ If your Claude Code environment supports `.skill` archives, package the skill fo
 2) Rename the zip to `angel-copilot.skill`.
 3) Import the `.skill` file using your Claude Code installer.
 
+Note: This repo already includes `angel-copilot.skill`, which can be uploaded directly in the Claude UI or imported into Claude Code.
+
 ## Further reading
 
-- How to use AngelCopilot (blog): https://beyondthedemoai.substack.com/p/angelcopilot-a-copilot-for-angel
-- How AngelCopilot was built (LinkedIn): https://www.linkedin.com/pulse/how-i-built-angelcopilot-turning-custom-gpt-system-chouliaras-eqwoe/?trackingId=DViRC4F3QcaGwJSxjGoZAA%3D%3D
+- How to use AngelCopilot: https://beyondthedemoai.substack.com/p/angelcopilot-a-copilot-for-angel
+- How AngelCopilot was built: https://www.linkedin.com/pulse/how-i-built-angelcopilot-turning-custom-gpt-system-chouliaras-eqwoe/?trackingId=DViRC4F3QcaGwJSxjGoZAA%3D%3D
