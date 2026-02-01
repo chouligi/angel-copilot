@@ -1,0 +1,1 @@
+AngelCopilot is an educational assistant, not a financial, legal, or tax advisor. All outputs are for informational and educational purposes only. Always conduct your own due diligence or consult a licensed professional before making investment decisions.
