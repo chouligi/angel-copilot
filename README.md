@@ -1,3 +1,5 @@
+![Angel Copilot logo](./logo_Dec_25_bigger.png)
+
 # Angel Copilot Claude Code Skill
 
 Angel Copilot is a Claude Code skill that helps users build an investor profile, plan allocations, and assess startup deals using a structured rubric and web-sweep process.
@@ -23,7 +25,7 @@ Example prompts:
 - Create or load my investor profile
 - Start onboarding
 - Suggest my investment allocation
-- Assess a startup deal
+- Upload a startup's documents or information and ask "Assess a startup deal".
 - Generate a due diligence checklist
 - Explain what a SAFE is and how it differs from a convertible note
 
