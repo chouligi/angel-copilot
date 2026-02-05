@@ -1,8 +1,8 @@
 ![Angel Copilot logo](./logo_Dec_25_bigger.png)
 
-# Angel Copilot Claude Code Skill
+# Angel Copilot Skill for AI Agent Tools
 
-Angel Copilot is a Claude Code skill that helps users build an investor profile, plan allocations, and assess startup deals using a structured rubric and web-sweep process.
+Angel Copilot is a skill for AI agent tools (e.g., Claude Code, Codex, etc.) that helps users build an investor profile, plan allocations, and assess startup deals using a structured rubric and web-sweep process.
 
 ## Use in the Claude UI (upload)
 
@@ -18,6 +18,14 @@ skills/public/angel-copilot
 ```
 
 If your Claude Code setup expects skills to live in a specific directory, you can also copy the folder there.
+
+## Use in Codex (local skill)
+
+Copy the skill folder to your Codex skills directory, typically:
+
+```
+~/.codex/skills/angel-copilot
+```
 
 ## Use
 
