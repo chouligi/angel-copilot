@@ -1,0 +1,6 @@
+Company: Alpha AI
+Round: Seed
+Instrument: Equity
+Traction: 28% MoM growth
+Geography: Europe
+Sector: AI

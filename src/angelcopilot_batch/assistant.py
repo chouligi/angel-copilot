@@ -1,0 +1,225 @@
+from __future__ import annotations
+
+import ast
+import json
+import re
+import subprocess
+from pathlib import Path
+
+REQUIRED_SCORE_KEYS = (
+    "Team",
+    "Market",
+    "Product",
+    "Traction",
+    "Unit Economics",
+    "Defensibility",
+    "Terms",
+)
+REQUIRED_PAYLOAD_FIELDS = (
+    "deal_id",
+    "company_name",
+    "category_scores",
+    "risk_flags",
+    "sectors",
+    "geographies",
+    "rationale",
+    "citations",
+    "category_rationales",
+    "web_sweep_findings",
+    "web_sweep_sources",
+    "milestones_to_monitor",
+    "key_unknowns",
+    "return_scenarios",
+    "assessment_limitations",
+    "assessment_process",
+)
+
+
+class CodexRunner:
+    def run_assessment(self, prompt: str, cwd: Path) -> dict[str, object]:
+        command = ["codex", "--search", "exec", "--skip-git-repo-check", "-C", str(cwd), "-"]
+        result = subprocess.run(command, input=prompt, capture_output=True, text=True, check=False)
+        if result.returncode != 0:
+            raise RuntimeError(f"Codex assessment failed: {result.stderr.strip()}")
+
+        payload = parse_assessment_json(result.stdout)
+        return validate_assessment_payload(payload)
+
+
+class ClaudeRunner:
+    def run_assessment(self, prompt: str, cwd: Path) -> dict[str, object]:
+        command = ["claude", "-p"]
+        result = subprocess.run(command, input=prompt, capture_output=True, text=True, check=False, cwd=str(cwd))
+        if result.returncode != 0:
+            raise RuntimeError(f"Claude assessment failed: {result.stderr.strip()}")
+
+        payload = parse_assessment_json(result.stdout)
+        return validate_assessment_payload(payload)
+
+
+def parse_assessment_json(raw_output: str) -> dict[str, object]:
+    cleaned = raw_output.strip()
+    try:
+        parsed = json.loads(cleaned)
+        if isinstance(parsed, dict):
+            return parsed
+    except json.JSONDecodeError:
+        pass
+
+    fenced_match = re.search(r"```json\s*(\{.*\})\s*```", cleaned, flags=re.DOTALL)
+    if fenced_match:
+        return json.loads(fenced_match.group(1))
+
+    bracket_match = re.search(r"(\{.*\})", cleaned, flags=re.DOTALL)
+    if bracket_match:
+        return json.loads(bracket_match.group(1))
+
+    raise ValueError("Assistant output did not contain valid JSON")
+
+
+def validate_assessment_payload(payload: dict[str, object]) -> dict[str, object]:
+    for field in REQUIRED_PAYLOAD_FIELDS:
+        if field not in payload:
+            raise ValueError(f"Missing required field: {field}")
+
+    scores = payload["category_scores"]
+    if not isinstance(scores, dict):
+        raise ValueError("category_scores must be an object")
+
+    normalized_scores: dict[str, float] = {}
+    for key in REQUIRED_SCORE_KEYS:
+        if key not in scores:
+            raise ValueError(f"Missing required score key: {key}")
+        normalized_scores[key] = float(scores[key])
+
+    category_rationales = payload["category_rationales"]
+    if not isinstance(category_rationales, dict):
+        raise ValueError("category_rationales must be an object")
+
+    normalized_rationales: dict[str, str] = {}
+    for key in REQUIRED_SCORE_KEYS:
+        if key not in category_rationales:
+            raise ValueError(f"Missing category rationale: {key}")
+        normalized_rationales[key] = str(category_rationales[key])
+
+    return_scenarios = payload["return_scenarios"]
+    if not isinstance(return_scenarios, list):
+        raise ValueError("return_scenarios must be a list")
+    if len(return_scenarios) < 3:
+        raise ValueError("return_scenarios must include at least 3 scenarios")
+
+    assessment_process = payload["assessment_process"]
+    if not isinstance(assessment_process, dict):
+        raise ValueError("assessment_process must be an object")
+
+    required_process_flags = (
+        "single_deal_equivalent",
+        "used_full_rubric",
+        "performed_web_sweep",
+        "reconciled_docs_with_web",
+        "built_three_case_return_model",
+    )
+    normalized_process: dict[str, object] = {}
+    for key in required_process_flags:
+        if key not in assessment_process:
+            raise ValueError(f"Missing assessment_process key: {key}")
+        value = assessment_process[key]
+        if key == "single_deal_equivalent":
+            normalized_process[key] = str(value)
+            continue
+        normalized_process[key] = _normalize_bool(value, field_name=f"assessment_process.{key}")
+
+    if "notes" in assessment_process:
+        normalized_process["notes"] = str(assessment_process["notes"])
+
+    return {
+        "deal_id": str(payload["deal_id"]),
+        "company_name": str(payload["company_name"]),
+        "category_scores": normalized_scores,
+        "risk_flags": [str(item) for item in _as_list(payload["risk_flags"])],
+        "sectors": [str(item) for item in _as_list(payload["sectors"])],
+        "geographies": [str(item) for item in _as_list(payload["geographies"])],
+        "rationale": str(payload["rationale"]),
+        "citations": [_normalize_detail_item(item) for item in _as_list(payload["citations"])],
+        "category_rationales": normalized_rationales,
+        "web_sweep_findings": [_normalize_detail_item(item) for item in _as_list(payload["web_sweep_findings"])],
+        "web_sweep_sources": [_normalize_detail_item(item) for item in _as_list(payload["web_sweep_sources"])],
+        "milestones_to_monitor": [str(item) for item in _as_list(payload["milestones_to_monitor"])],
+        "key_unknowns": [str(item) for item in _as_list(payload["key_unknowns"])],
+        "return_scenarios": [dict(item) for item in return_scenarios if isinstance(item, dict)],
+        "assessment_limitations": str(payload["assessment_limitations"]),
+        "assessment_process": normalized_process,
+        "verdict_one_liner": str(payload.get("verdict_one_liner", "")),
+        "why_not_invest_now": [str(item) for item in _as_list(payload.get("why_not_invest_now", []))],
+        "what_would_upgrade_to_invest": [
+            str(item) for item in _as_list(payload.get("what_would_upgrade_to_invest", []))
+        ],
+    }
+
+
+def build_assistant_runner(name: str):
+    normalized = name.strip().lower()
+    if normalized == "codex":
+        return CodexRunner()
+    if normalized == "claude":
+        return ClaudeRunner()
+    raise ValueError(f"Unsupported assistant runner: {name}")
+
+
+def _as_list(value: object) -> list[object]:
+    if isinstance(value, list):
+        return value
+    if value is None:
+        return []
+    return [value]
+
+
+def _normalize_detail_item(item: object) -> dict[str, object] | str:
+    if isinstance(item, dict):
+        normalized: dict[str, object] = {}
+        for key, value in item.items():
+            normalized[str(key)] = _normalize_detail_scalar(value)
+        return normalized
+    if isinstance(item, str):
+        parsed = _try_parse_detail_mapping(item)
+        if parsed is not None:
+            return parsed
+    return str(item)
+
+
+def _normalize_detail_scalar(value: object) -> object:
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): str(item) for key, item in value.items()}
+    return str(value)
+
+
+def _try_parse_detail_mapping(raw: str) -> dict[str, object] | None:
+    text = raw.strip()
+    if not (text.startswith("{") and text.endswith("}")):
+        return None
+
+    parsers = (json.loads, ast.literal_eval)
+    for parser in parsers:
+        try:
+            parsed = parser(text)
+        except Exception:  # noqa: BLE001
+            continue
+        if isinstance(parsed, dict):
+            return {str(key): _normalize_detail_scalar(value) for key, value in parsed.items()}
+    return None
+
+
+def _normalize_bool(value: object, field_name: str) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "yes"}:
+            return True
+        if normalized in {"false", "no"}:
+            return False
+    raise ValueError(f"{field_name} must be boolean")
