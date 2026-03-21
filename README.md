@@ -166,7 +166,7 @@ Each run produces:
 - Batch mode expects one folder per deal and autodetects `txt/md/pdf/docx/zip`.
 - `.zip` files are unzipped and parsed automatically during processing.
 - Profile is local to the repo by default (`.angelcopilot/profile.md`) and excluded from git.
-- Upstream document capture from AngelList remains manual/official.
+- Upstream document capture from deal platforms remains manual/official.
 - No scraping automation is included.
 
 ## Testing without production docs

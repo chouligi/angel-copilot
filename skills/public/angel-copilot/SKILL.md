@@ -147,7 +147,7 @@ To assess manually, please provide:
   - New deals are detected via a date window (`--since-days`, default `7`).
   - Local profile is loaded from `.angelcopilot/profile.md` (repo-local) by default.
 - Batch mode still applies this rubric and recommendation logic, then adds portfolio-fit attention flags (`INVEST + strong WAIT` with risk gates).
-- Do not suggest or implement scraping automation of AngelList pages in this skill flow; use official/manual export workflow for source documents.
+- Do not suggest or implement scraping automation of deal-platform pages in this skill flow; use official/manual export workflow for source documents.
 
 ### Default web-sweep SOP (required before scoring)
 - Always perform a web-sweep before scoring any deal.
