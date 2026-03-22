@@ -66,3 +66,82 @@ def test_discover_recent_deals__includes_zip_only_deal_folder(tmp_path: Path) ->
     assert len(deals) == 1
     assert deals[0].deal_id == "zip_only_deal"
     assert zip_path in deals[0].supported_files
+
+
+def test_discover_recent_deals__recurses_into_syndicate_containers(tmp_path: Path) -> None:
+    deals_root = tmp_path / "deals"
+    syndicate = deals_root / "syndicate_container"
+    deal_a = syndicate / "Deal A_03_21_2026"
+    deal_b = syndicate / "Deal B_03_22_2026"
+    deal_a.mkdir(parents=True)
+    deal_b.mkdir(parents=True)
+    (deal_a / "memo.txt").write_text("deal a", encoding="utf-8")
+    (deal_b / "memo.txt").write_text("deal b", encoding="utf-8")
+
+    deals = discover_recent_deals(deals_root=deals_root, since_days=7, top_level_containers=True)
+
+    deal_ids = {deal.deal_id for deal in deals}
+    assert "syndicate_container" not in deal_ids
+    assert deal_ids == {"Deal A_03_21_2026", "Deal B_03_22_2026"}
+
+
+def test_discover_recent_deals__keeps_deal_parent_when_docs_are_in_nested_folder(tmp_path: Path) -> None:
+    deals_root = tmp_path / "deals"
+    syndicate = deals_root / "syndicate_container"
+    deal_parent = syndicate / "Deal C_03_22_2026"
+    docs_dir = deal_parent / "Data Room"
+    docs_dir.mkdir(parents=True)
+    (docs_dir / "memo.txt").write_text("deal c", encoding="utf-8")
+
+    deals = discover_recent_deals(deals_root=deals_root, since_days=7, top_level_containers=True)
+
+    assert len(deals) == 1
+    assert deals[0].deal_id == "Deal C_03_22_2026"
+    assert deals[0].path == deal_parent
+
+
+def test_discover_recent_deals__ignores_container_even_with_direct_docs(tmp_path: Path) -> None:
+    deals_root = tmp_path / "deals"
+    syndicate = deals_root / "syndicate_container"
+    deal_a = syndicate / "Deal A_03_21_2026"
+    deal_b = syndicate / "Deal B_03_22_2026"
+    deal_a.mkdir(parents=True)
+    deal_b.mkdir(parents=True)
+    (syndicate / "cover_note.txt").write_text("container level note", encoding="utf-8")
+    (deal_a / "memo.txt").write_text("deal a", encoding="utf-8")
+    (deal_b / "memo.txt").write_text("deal b", encoding="utf-8")
+
+    deals = discover_recent_deals(deals_root=deals_root, since_days=7, top_level_containers=True)
+    deal_ids = {deal.deal_id for deal in deals}
+
+    assert "syndicate_container" not in deal_ids
+    assert deal_ids == {"Deal A_03_21_2026", "Deal B_03_22_2026"}
+
+
+def test_discover_recent_deals__includes_standalone_file_deals_in_container(tmp_path: Path) -> None:
+    deals_root = tmp_path / "deals"
+    syndicate = deals_root / "syndicate_container"
+    deal_dir = syndicate / "Deal A_03_21_2026"
+    deal_dir.mkdir(parents=True)
+    (deal_dir / "memo.txt").write_text("deal a", encoding="utf-8")
+    standalone = syndicate / "Deal B_03_22_2026.pdf"
+    standalone.write_bytes(b"%PDF-1.4\n%test\n")
+
+    deals = discover_recent_deals(deals_root=deals_root, since_days=7, top_level_containers=True)
+    deal_ids = {deal.deal_id for deal in deals}
+
+    assert deal_ids == {"Deal A_03_21_2026", "Deal B_03_22_2026"}
+
+
+def test_discover_recent_deals__does_not_emit_top_level_container_as_deal(tmp_path: Path) -> None:
+    deals_root = tmp_path / "deals"
+    syndicate = deals_root / "syndicate_container"
+    syndicate.mkdir(parents=True)
+    (syndicate / "Deal D_03_22_2026.pdf").write_bytes(b"%PDF-1.4\n%test\n")
+    (syndicate / "Deal D_03_22_2026.txt").write_text("duplicate text export", encoding="utf-8")
+
+    deals = discover_recent_deals(deals_root=deals_root, since_days=7, top_level_containers=True)
+    deal_ids = {deal.deal_id for deal in deals}
+
+    assert "syndicate_container" not in deal_ids
+    assert "Deal D_03_22_2026" in deal_ids

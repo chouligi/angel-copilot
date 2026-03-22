@@ -6,9 +6,8 @@ from pathlib import Path
 import subprocess
 import sys
 
-from angelcopilot_batch.assistant import build_assistant_runner
 from angelcopilot_batch.intake import discover_recent_deals
-from angelcopilot_batch.pipeline import build_default_run_id, run_batch_assessment
+from angelcopilot_batch.job import run_batch_job
 from angelcopilot_batch.profile import load_investor_profile
 from angelcopilot_batch.reporting import (
     ASSESSMENTS_JSON_FILENAME,
@@ -39,44 +38,32 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _run_batch(args: argparse.Namespace) -> int:
-    deals_root = Path(args.deals_root).expanduser().resolve()
-    output_dir = Path(args.out).expanduser().resolve()
-    profile_path = Path(args.profile).expanduser().resolve()
-
-    profile = load_investor_profile(profile_path)
-    runner = build_assistant_runner(args.assistant)
-
-    assessments = run_batch_assessment(
-        deals_root=deals_root,
+    top_level_containers = args.layout == "syndicates"
+    result = run_batch_job(
+        deals_root=args.deals_root,
         since_days=args.since_days,
-        profile=profile,
-        runner=runner,
-        cwd=Path.cwd(),
-    )
-
-    run_id = args.run_id or build_default_run_id()
-    output_paths = write_batch_outputs(
-        assessments=assessments,
-        output_dir=output_dir,
-        run_id=run_id,
+        assistant=args.assistant,
+        profile_path=args.profile,
+        out=args.out,
+        skill_path=args.skill_path,
+        top_level_containers=top_level_containers,
         include_pdf=args.pdf,
+        run_id=args.run_id or None,
+        cwd=Path.cwd(),
+        logger=print,
     )
-
-    print(f"Deals scored: {len(assessments)}")
-    print(f"Markdown report: {output_paths.markdown_path}")
-    print(f"CSV report: {output_paths.csv_path}")
-    print(f"JSON report: {output_paths.json_path}")
-    if output_paths.pdf_path:
-        print(f"PDF report: {output_paths.pdf_path}")
-    else:
-        print("PDF report: not generated (Playwright not available)")
+    print(f"Deals scored: {len(result.assessments)}")
 
     return 0
 
 
 def _validate_batch(args: argparse.Namespace) -> int:
     deals_root = Path(args.deals_root).expanduser().resolve()
-    deals = discover_recent_deals(deals_root=deals_root, since_days=args.since_days)
+    deals = discover_recent_deals(
+        deals_root=deals_root,
+        since_days=args.since_days,
+        top_level_containers=(args.layout == "syndicates"),
+    )
 
     print(f"Detected deals: {len(deals)}")
     for deal in deals:
@@ -144,6 +131,8 @@ def _build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--deals-root", required=True)
     run_parser.add_argument("--since-days", type=int, default=7)
     run_parser.add_argument("--assistant", choices=["codex", "claude"], default="codex")
+    run_parser.add_argument("--layout", choices=["syndicates", "flat"], default="syndicates")
+    run_parser.add_argument("--skill-path", default="~/.codex/skills/angel-copilot/SKILL.md")
     run_parser.add_argument("--profile", default=".angelcopilot/profile.md")
     run_parser.add_argument("--out", default="outputs")
     run_parser.add_argument("--run-id", default="")
@@ -152,6 +141,7 @@ def _build_parser() -> argparse.ArgumentParser:
     validate_parser = batch_subparsers.add_parser("validate", help="Validate intake folders")
     validate_parser.add_argument("--deals-root", required=True)
     validate_parser.add_argument("--since-days", type=int, default=7)
+    validate_parser.add_argument("--layout", choices=["syndicates", "flat"], default="syndicates")
 
     report_parser = batch_subparsers.add_parser("report", help="Rebuild reports from JSON")
     report_parser.add_argument("--run-id", required=True)

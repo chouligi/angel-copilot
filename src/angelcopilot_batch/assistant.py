@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import json
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -160,8 +161,10 @@ def validate_assessment_payload(payload: dict[str, object]) -> dict[str, object]
 def build_assistant_runner(name: str):
     normalized = name.strip().lower()
     if normalized == "codex":
+        _require_command("codex")
         return CodexRunner()
     if normalized == "claude":
+        _require_command("claude")
         return ClaudeRunner()
     raise ValueError(f"Unsupported assistant runner: {name}")
 
@@ -223,3 +226,12 @@ def _normalize_bool(value: object, field_name: str) -> bool:
         if normalized in {"false", "no"}:
             return False
     raise ValueError(f"{field_name} must be boolean")
+
+
+def _require_command(command: str) -> None:
+    if shutil.which(command):
+        return
+    raise RuntimeError(
+        f"Required CLI '{command}' was not found in PATH. "
+        f"Install it or add it to PATH, or switch --assistant."
+    )

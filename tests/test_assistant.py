@@ -7,6 +7,7 @@ import pytest
 
 from angelcopilot_batch.assistant import (
     CodexRunner,
+    build_assistant_runner,
     parse_assessment_json,
     validate_assessment_payload,
 )
@@ -126,3 +127,9 @@ def test_codex_runner__builds_expected_command(monkeypatch: pytest.MonkeyPatch, 
     assert observed["input"] == "prompt text"
     assert result["deal_id"] == "d1"
     assert result["verdict_one_liner"] == "Strong team but early traction."
+
+
+def test_build_assistant_runner__raises_when_binary_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("shutil.which", lambda command: None)
+    with pytest.raises(RuntimeError, match="Required CLI 'codex' was not found in PATH"):
+        build_assistant_runner("codex")

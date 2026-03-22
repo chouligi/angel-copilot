@@ -289,6 +289,20 @@ def _render_markdown(
         lines.extend(["", "#### Assessment Limitations", ""])
         lines.append(assessment.assessment_limitations or "- No limitations provided.")
 
+        lines.extend(["", "#### Files Used as Evidence", ""])
+        if assessment.evidence_sources:
+            for source in assessment.evidence_sources:
+                lines.append(f"- {_markdown_cell(source)}")
+        else:
+            lines.append("- No evidence files recorded.")
+
+        lines.extend(["", "#### Evidence Preparation Warnings", ""])
+        if assessment.extraction_warnings:
+            for warning in assessment.extraction_warnings:
+                lines.append(f"- {_markdown_cell(warning)}")
+        else:
+            lines.append("- No evidence preparation warnings.")
+
         lines.extend(["#### Sources", ""])
         if assessment.citations:
             for citation in assessment.citations:
@@ -393,6 +407,7 @@ def _render_html(assessments: list[AssessmentResult], run_id: str) -> str:
         "table{width:100%;border-collapse:collapse;background:#fff;}"
         "th,td{border:1px solid #d1d5db;padding:8px;text-align:left;font-size:12px;vertical-align:top;}"
         "th{background:#111827;color:#fff;}"
+        "tr.attention-row td{background:#edf8ef;}"
         ".pill{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;}"
         ".pill-invest{background:#dcfce7;color:#166534;}"
         ".pill-wait{background:#fef9c3;color:#854d0e;}"
@@ -492,8 +507,9 @@ def _humanize_run_id_timestamp(run_id: str) -> str:
 def _render_overview_row_html(assessment: AssessmentResult) -> str:
     verdict_class = _verdict_pill_class(assessment.verdict)
     attention = "YES" if assessment.attention_flag else "NO"
+    row_class = "attention-row" if assessment.attention_flag else ""
     return (
-        "<tr>"
+        f"<tr class='{row_class}'>"
         f"<td>{escape(assessment.company_name)}</td>"
         f"<td>{escape(assessment.deal_id)}</td>"
         f"<td>{assessment.weighted_score:.2f}</td>"
@@ -521,6 +537,14 @@ def _render_appendix_section_html(index: int, assessment: AssessmentResult) -> s
     citation_items = "".join(f"<li>{_format_html_detail(citation)}</li>" for citation in assessment.citations)
     if not citation_items:
         citation_items = "<li>No citations provided.</li>"
+
+    evidence_items = "".join(f"<li>{escape(source)}</li>" for source in assessment.evidence_sources)
+    if not evidence_items:
+        evidence_items = "<li>No evidence files recorded.</li>"
+
+    warning_items = "".join(f"<li>{escape(warning)}</li>" for warning in assessment.extraction_warnings)
+    if not warning_items:
+        warning_items = "<li>No evidence preparation warnings.</li>"
 
     web_findings_rows = _render_web_findings_rows_html(assessment.web_sweep_findings)
     web_sources_table_html = _render_web_sources_table_html(assessment.web_sweep_sources)
@@ -588,6 +612,10 @@ def _render_appendix_section_html(index: int, assessment: AssessmentResult) -> s
         f"<tbody>{return_rows_with_values}</tbody></table>"
         "<h3>Assessment Limitations</h3>"
         f"<div class='rationale'>{escape(assessment.assessment_limitations or 'No limitations provided.')}</div>"
+        "<h3>Files Used as Evidence</h3>"
+        f"<ul>{evidence_items}</ul>"
+        "<h3>Evidence Preparation Warnings</h3>"
+        f"<ul>{warning_items}</ul>"
         "<h3>Sources</h3>"
         f"<ul>{citation_items}</ul>"
         "<h3>Final Verdict</h3>"
@@ -804,7 +832,7 @@ def _format_web_finding_markdown(item: dict[str, object] | str) -> str:
     area = str(detail.get("area") or detail.get("category") or "General")
     finding = str(detail.get("finding") or detail.get("summary") or detail.get("note") or "No finding provided.")
     reconciliation = str(detail.get("reconciliation") or detail.get("reconcile") or "")
-    text = f"{area}: {finding.strip()}"
+    text = f"**{area}:** {finding.strip()}"
     if reconciliation:
         text += f" Reconciliation: {_finalize_sentence(reconciliation)}"
     return _markdown_cell(text)
@@ -818,10 +846,10 @@ def _format_web_finding_html(item: dict[str, object] | str) -> str:
     area = str(detail.get("area") or detail.get("category") or "General")
     finding = str(detail.get("finding") or detail.get("summary") or detail.get("note") or "No finding provided.")
     reconciliation = str(detail.get("reconciliation") or detail.get("reconcile") or "")
-    text = f"{area}: {finding.strip()}"
+    text = f"<strong>{escape(area)}:</strong> {escape(finding.strip())}"
     if reconciliation:
-        text += f" Reconciliation: {_finalize_sentence(reconciliation)}"
-    return escape(text)
+        text += f" Reconciliation: {escape(_finalize_sentence(reconciliation))}"
+    return text
 
 
 def _finalize_sentence(value: str) -> str:

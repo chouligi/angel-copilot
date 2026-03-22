@@ -28,6 +28,8 @@ def test_write_batch_outputs__writes_md_csv_json(tmp_path: Path) -> None:
             verdict="WAIT",
             attention_flag=True,
             attention_reason="Strong WAIT",
+            evidence_sources=["/tmp/source/deck.pdf", "/tmp/source/archive.zip!inner/memo.txt"],
+            extraction_warnings=["No supported docs found in archive: /tmp/source/empty.zip"],
             verdict_one_liner="Compelling direction, but needs commercial proof.",
             why_not_invest_now=["Terms are stretched for stage.", "Evidence gap on traction and unit economics."],
             what_would_upgrade_to_invest=[
@@ -55,10 +57,15 @@ def test_write_batch_outputs__writes_md_csv_json(tmp_path: Path) -> None:
     assert "## Appendix: Individual Assessments" in markdown_text
     assert "### 1. Acme (`d1`)" in markdown_text
     assert "#### Final Verdict" in markdown_text
+    assert "#### Files Used as Evidence" in markdown_text
+    assert "/tmp/source/archive.zip!inner/memo.txt" in markdown_text
+    assert "#### Evidence Preparation Warnings" in markdown_text
     assert "Why not INVEST now:" in markdown_text
     assert "What would upgrade to INVEST:" in markdown_text
     assert "AngelCopilot Batch Report" in html_text
     assert "Appendix: Individual Assessments" in html_text
+    assert "Files Used as Evidence" in html_text
+    assert "Evidence Preparation Warnings" in html_text
     assert "Final Verdict" in html_text
     assert "Why not INVEST now" in html_text
     assert "data:image/png;base64" in html_text

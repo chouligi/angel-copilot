@@ -46,6 +46,42 @@ python3 -m pip install -r requirements.txt
 python3 -m pip install -e .
 ```
 
+### Install assistant CLI(s) used by batch mode
+
+Batch mode calls a local assistant binary (`codex` or `claude`), so it must be installed and available in your shell `PATH`.
+
+Codex CLI:
+
+```bash
+npm install -g @openai/codex
+which codex
+codex --version
+codex --login
+```
+
+Claude Code CLI:
+
+```bash
+which claude
+claude --version
+```
+
+If `which codex` or `which claude` returns nothing, the binary is not in `PATH`.
+
+For `zsh`, add the install directory to `~/.zshrc`, then reload:
+
+```bash
+echo 'export PATH="/path/to/cli/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+Example for `nvm` users:
+
+```bash
+echo 'export PATH="$HOME/.nvm/versions/node/v20.19.6/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+```
+
 Then run one setup command for PDF support:
 
 ```bash
@@ -113,7 +149,7 @@ Also accepted for convenience:
 ### Validate weekly intake folder
 
 ```bash
-angelcopilot batch validate --deals-root /path/to/deals --since-days 7
+angelcopilot batch validate --deals-root /path/to/deals --since-days 7 --layout syndicates
 ```
 
 ### Run weekly batch assessment
@@ -123,11 +159,39 @@ angelcopilot batch run \
   --deals-root /path/to/deals \
   --since-days 7 \
   --assistant codex \
+  --layout syndicates \
+  --skill-path ~/.codex/skills/angel-copilot/SKILL.md \
   --profile .angelcopilot/profile.md \
   --out outputs
 ```
 
 You can switch to Claude CLI with `--assistant claude`.
+Batch execution always runs in skill-native mode (one AngelCopilot skill invocation per deal).
+Layout modes:
+- `syndicates` (default): treat top-level folders as containers; child folders are deals; standalone child `pdf/docx/zip` files are also deals.
+- `flat`: treat top-level folders as deal folders.
+
+### Run from Python with progress logging
+
+```python
+from angelcopilot_batch.job import run_batch_job
+
+result = run_batch_job(
+    deals_root="/path/to/deals",
+    since_days=2,
+    assistant="codex",
+    skill_path="~/.codex/skills/angel-copilot/SKILL.md",
+    profile_path=".angelcopilot/profile.md",
+    out="outputs",
+)
+```
+
+This prints live progress like:
+- batch started summary
+- current deal index and name (`starting deal ...`)
+- per-deal completion (`done ... score=... verdict=...`)
+- failures/skips with reason
+- final output paths (`md/csv/json/pdf`)
 
 ### Rebuild report artifacts for an existing run
 
@@ -164,10 +228,11 @@ Each run produces:
 
 ### Notes
 - Batch mode expects one folder per deal and autodetects `txt/md/pdf/docx/zip`.
-- `.zip` files are unzipped and parsed automatically during processing.
+- `.zip` files are unzipped recursively during preprocessing (including nested zip files).
 - Profile is local to the repo by default (`.angelcopilot/profile.md`) and excluded from git.
 - Upstream document capture from deal platforms remains manual/official.
 - No scraping automation is included.
+- Reports include a per-deal `Files Used as Evidence` section and any `Evidence Preparation Warnings`.
 
 ## Testing without production docs
 

@@ -8,6 +8,8 @@ from angelcopilot_batch.pipeline import run_batch_assessment
 
 class FakeRunner:
     def run_assessment(self, prompt: str, cwd: Path) -> dict[str, object]:
+        del prompt
+        del cwd
         return {
             "deal_id": "deal_a",
             "company_name": "Deal A",
@@ -58,6 +60,23 @@ class FakeRunner:
         }
 
 
+class CapturingRunner:
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+
+    def run_assessment(self, prompt: str, cwd: Path) -> dict[str, object]:
+        del cwd
+        self.prompts.append(prompt)
+        return FakeRunner().run_assessment(prompt="", cwd=Path("."))
+
+
+class FailingRunner:
+    def run_assessment(self, prompt: str, cwd: Path) -> dict[str, object]:
+        del prompt
+        del cwd
+        raise RuntimeError("intentional failure")
+
+
 def test_run_batch_assessment__processes_recent_deals_end_to_end(tmp_path: Path) -> None:
     deals_root = tmp_path / "deals"
     deal_folder = deals_root / "deal_a"
@@ -76,3 +95,92 @@ def test_run_batch_assessment__processes_recent_deals_end_to_end(tmp_path: Path)
     assert len(results) == 1
     assert results[0].deal_id == "deal_a"
     assert results[0].weighted_score > 0
+
+
+def test_run_batch_assessment__skill_native_mode_uses_skill_reference(tmp_path: Path) -> None:
+    deals_root = tmp_path / "deals"
+    deal_folder = deals_root / "deal_a"
+    deal_folder.mkdir(parents=True)
+    (deal_folder / "memo.txt").write_text("AI startup with traction", encoding="utf-8")
+    profile_path = tmp_path / "profile.md"
+    profile_path.write_text("region: EU\ncurrency: EUR\n", encoding="utf-8")
+    runtime_skill_path = tmp_path / "SKILL.md"
+    runtime_skill_path.write_text("placeholder skill", encoding="utf-8")
+
+    profile = InvestorProfile(sectors_themes=["AI"], geo_focus=["Europe"])
+    runner = CapturingRunner()
+
+    results = run_batch_assessment(
+        deals_root=deals_root,
+        since_days=7,
+        profile=profile,
+        runner=runner,
+        cwd=tmp_path,
+        profile_path=profile_path,
+        runtime_skill_path=runtime_skill_path,
+    )
+
+    assert len(results) == 1
+    assert runner.prompts
+    prompt = runner.prompts[0]
+    assert "[$angel-copilot](" in prompt
+    assert str(runtime_skill_path) in prompt
+    assert "assess the deal in " in prompt
+    assert str(deal_folder) not in prompt
+    assert str(profile_path) in prompt
+
+
+def test_run_batch_assessment__emits_progress_events(tmp_path: Path) -> None:
+    deals_root = tmp_path / "deals"
+    deal_folder = deals_root / "deal_a"
+    deal_folder.mkdir(parents=True)
+    (deal_folder / "memo.txt").write_text("AI startup with traction", encoding="utf-8")
+
+    profile = InvestorProfile(sectors_themes=["AI"], geo_focus=["Europe"])
+    events: list[str] = []
+
+    def progress(event: str, payload: dict[str, object]) -> None:
+        del payload
+        events.append(event)
+
+    results = run_batch_assessment(
+        deals_root=deals_root,
+        since_days=7,
+        profile=profile,
+        runner=FakeRunner(),
+        cwd=tmp_path,
+        progress_callback=progress,
+    )
+
+    assert len(results) == 1
+    assert events[0] == "batch_started"
+    assert "deal_started" in events
+    assert "deal_completed" in events
+    assert events[-1] == "batch_completed"
+
+
+def test_run_batch_assessment__emits_deal_failed_when_runner_errors(tmp_path: Path) -> None:
+    deals_root = tmp_path / "deals"
+    deal_folder = deals_root / "deal_a"
+    deal_folder.mkdir(parents=True)
+    (deal_folder / "memo.txt").write_text("AI startup with traction", encoding="utf-8")
+
+    profile = InvestorProfile(sectors_themes=["AI"], geo_focus=["Europe"])
+    events: list[tuple[str, dict[str, object]]] = []
+
+    def progress(event: str, payload: dict[str, object]) -> None:
+        events.append((event, payload))
+
+    results = run_batch_assessment(
+        deals_root=deals_root,
+        since_days=7,
+        profile=profile,
+        runner=FailingRunner(),
+        cwd=tmp_path,
+        progress_callback=progress,
+    )
+
+    assert results == []
+    failed_events = [payload for event, payload in events if event == "deal_failed"]
+    assert len(failed_events) == 1
+    assert failed_events[0]["reason"] == "assistant_failed"

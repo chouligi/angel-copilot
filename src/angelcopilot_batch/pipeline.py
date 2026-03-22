@@ -1,17 +1,18 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
 from angelcopilot_batch.assistant import validate_assessment_payload
-from angelcopilot_batch.extraction import extract_evidence_bundle
 from angelcopilot_batch.intake import discover_recent_deals
-from angelcopilot_batch.models import AssessmentResult, EvidenceBlock, InvestorProfile
+from angelcopilot_batch.models import AssessmentResult, InvestorProfile
+from angelcopilot_batch.preparation import cleanup_prepared_workspace, prepare_deal_workspace
 from angelcopilot_batch.scoring import apply_scoring_rules
 
-DEFAULT_SKILL_PATH = Path("skills/public/angel-copilot/SKILL.md")
-DEFAULT_RUBRIC_PATH = Path("skills/public/angel-copilot/references/angelcopilot_deal_assessment_rubric.md")
-MAX_EVIDENCE_CHARS = 200_000
+DEFAULT_RUNTIME_SKILL_PATH = Path.home() / ".codex" / "skills" / "angel-copilot" / "SKILL.md"
+EXECUTION_MODE_SKILL_NATIVE = "skill_native"
+ProgressCallback = Callable[[str, dict[str, object]], None]
 
 
 def run_batch_assessment(
@@ -20,32 +21,105 @@ def run_batch_assessment(
     profile: InvestorProfile,
     runner,
     cwd: Path,
-    skill_path: Path = DEFAULT_SKILL_PATH,
-    rubric_path: Path = DEFAULT_RUBRIC_PATH,
+    profile_path: Path | None = None,
+    execution_mode: str = EXECUTION_MODE_SKILL_NATIVE,
+    runtime_skill_path: Path = DEFAULT_RUNTIME_SKILL_PATH,
+    top_level_containers: bool = False,
+    progress_callback: ProgressCallback | None = None,
 ) -> list[AssessmentResult]:
-    deals = discover_recent_deals(deals_root=deals_root, since_days=since_days)
-    skill_text = _safe_read_text(skill_path)
-    rubric_text = _safe_read_text(rubric_path)
+    if execution_mode != EXECUTION_MODE_SKILL_NATIVE:
+        raise ValueError(f"Unsupported execution mode: {execution_mode}")
+
+    deals = discover_recent_deals(
+        deals_root=deals_root,
+        since_days=since_days,
+        top_level_containers=top_level_containers,
+    )
+    resolved_profile_path = (
+        profile_path.expanduser().resolve() if profile_path is not None else Path(".angelcopilot/profile.md").resolve()
+    )
+    resolved_runtime_skill_path = runtime_skill_path.expanduser().resolve()
+    _emit_progress(
+        progress_callback,
+        "batch_started",
+        {
+            "deals_root": str(deals_root),
+            "since_days": since_days,
+            "total_deals": len(deals),
+            "execution_mode": execution_mode,
+        },
+    )
 
     assessments: list[AssessmentResult] = []
-    for deal in deals:
-        evidence_bundle = extract_evidence_bundle(deal.supported_files)
-        if not evidence_bundle.evidence_blocks:
-            continue
-
-        prompt = build_assessment_prompt(
+    for index, deal in enumerate(deals, start=1):
+        _emit_progress(
+            progress_callback,
+            "deal_started",
+            {
+                "deal_id": deal.deal_id,
+                "deal_path": str(deal.path),
+                "index": index,
+                "total": len(deals),
+                "supported_files": len(deal.supported_files),
+            },
+        )
+        prepared_workspace = prepare_deal_workspace(
+            deal_path=deal.path,
+            supported_files=deal.supported_files,
             deal_id=deal.deal_id,
-            profile=profile,
-            skill_text=skill_text,
-            rubric_text=rubric_text,
-            evidence_bundle=evidence_bundle,
+        )
+        if not prepared_workspace.files_used:
+            _emit_progress(
+                progress_callback,
+                "deal_skipped",
+                {
+                    "deal_id": deal.deal_id,
+                    "index": index,
+                    "total": len(deals),
+                    "reason": "no_prepared_files",
+                },
+            )
+            cleanup_prepared_workspace(prepared_workspace)
+            continue
+        prompt = build_skill_native_prompt(
+            deal_id=deal.deal_id,
+            deal_path=prepared_workspace.workspace_path / "docs",
+            profile_path=resolved_profile_path,
+            runtime_skill_path=resolved_runtime_skill_path,
         )
 
-        payload = _run_with_retry(runner=runner, prompt=prompt, cwd=cwd)
+        payload, error_message = _run_with_retry(runner=runner, prompt=prompt, cwd=cwd)
         if payload is None:
+            _emit_progress(
+                progress_callback,
+                "deal_failed",
+                {
+                    "deal_id": deal.deal_id,
+                    "index": index,
+                    "total": len(deals),
+                    "reason": "assistant_failed",
+                    "error": error_message or "",
+                },
+            )
+            cleanup_prepared_workspace(prepared_workspace)
             continue
 
-        normalized_payload = validate_assessment_payload(payload)
+        try:
+            normalized_payload = validate_assessment_payload(payload)
+        except Exception as exc:  # noqa: BLE001
+            _emit_progress(
+                progress_callback,
+                "deal_failed",
+                {
+                    "deal_id": deal.deal_id,
+                    "index": index,
+                    "total": len(deals),
+                    "reason": "payload_validation_failed",
+                    "error": str(exc),
+                },
+            )
+            cleanup_prepared_workspace(prepared_workspace)
+            continue
         return_scenarios = [
             dict(item) for item in list(normalized_payload.get("return_scenarios", [])) if isinstance(item, dict)
         ]
@@ -92,29 +166,67 @@ def run_batch_assessment(
             what_would_upgrade_to_invest=[
                 str(item) for item in list(normalized_payload.get("what_would_upgrade_to_invest", []))
             ],
-            evidence_sources=_build_evidence_sources(evidence_bundle.evidence_blocks),
-            extraction_warnings=list(evidence_bundle.warnings),
+            evidence_sources=list(prepared_workspace.files_used),
+            extraction_warnings=list(prepared_workspace.warnings),
             hypothetical_investment=check_size,
             investment_currency=profile.currency.strip() or "USD",
             investment_basis=investment_basis,
             dilution_assumption=_infer_dilution_assumption(return_scenarios),
         )
-        assessments.append(apply_scoring_rules(assessment, profile))
+        scored = apply_scoring_rules(assessment, profile)
+        assessments.append(scored)
+        cleanup_prepared_workspace(prepared_workspace)
+        _emit_progress(
+            progress_callback,
+            "deal_completed",
+            {
+                "deal_id": scored.deal_id,
+                "company_name": scored.company_name,
+                "index": index,
+                "total": len(deals),
+                "files_used": len(prepared_workspace.files_used),
+                "weighted_score": scored.weighted_score,
+                "verdict": scored.verdict,
+                "attention_flag": scored.attention_flag,
+            },
+        )
 
-    return sorted(assessments, key=lambda item: item.weighted_score, reverse=True)
+    sorted_assessments = sorted(assessments, key=lambda item: item.weighted_score, reverse=True)
+    _emit_progress(
+        progress_callback,
+        "batch_completed",
+        {
+            "total_deals": len(deals),
+            "scored_deals": len(sorted_assessments),
+            "attention_deals": sum(1 for item in sorted_assessments if item.attention_flag),
+        },
+    )
+    return sorted_assessments
 
 
-def build_assessment_prompt(
+def build_skill_native_prompt(
     deal_id: str,
-    profile: InvestorProfile,
-    skill_text: str,
-    rubric_text: str,
-    evidence_bundle,
+    deal_path: Path,
+    profile_path: Path,
+    runtime_skill_path: Path = DEFAULT_RUNTIME_SKILL_PATH,
 ) -> str:
-    evidence_text = _build_capped_evidence_text(evidence_bundle.evidence_blocks, max_chars=MAX_EVIDENCE_CHARS)
-    warnings_text = "\n".join(evidence_bundle.warnings) if evidence_bundle.warnings else "None"
+    response_schema = _response_schema_template()
+    return (
+        f"Deal ID: {deal_id}\n"
+        f"[$angel-copilot]({runtime_skill_path}) assess the deal in {deal_path}\n"
+        f"Use investor profile from {profile_path}.\n"
+        "Run the skill workflow as a standalone single-deal assessment.\n"
+        "Do not re-implement or summarize the skill rules in a custom rubric.\n"
+        "Read files directly from the deal folder path provided.\n"
+        "After completing the assessment, output strict JSON only.\n"
+        f"Required JSON schema: {response_schema}\n"
+        f"If the assessed company name differs from folder name, keep deal_id as '{deal_id}'.\n"
+        "No markdown fences and no extra prose outside JSON.\n"
+    )
 
-    response_schema = (
+
+def _response_schema_template() -> str:
+    return (
         '{"deal_id":"...","company_name":"...","category_scores":{"Team":0,"Market":0,'
         '"Product":0,"Traction":0,"Unit Economics":0,"Defensibility":0,"Terms":0},'
         '"category_rationales":{"Team":"...","Market":"...","Product":"...","Traction":"...",'
@@ -135,41 +247,6 @@ def build_assessment_prompt(
         '"built_three_case_return_model":true,"notes":"..."}}'
     )
 
-    return (
-        "You are running one startup deal assessment using AngelCopilot logic.\n"
-        f"Deal ID: {deal_id}\n"
-        "Run the same depth as a single-deal dedicated assessment: "
-        "full rubric, web sweep, and evidence reconciliation.\n"
-        "Do not shortcut due to batch context. Treat this as a full standalone memo.\n"
-        "Output only JSON. No markdown or prose outside JSON.\n"
-        f"Required JSON schema: {response_schema}\n\n"
-        "Quality bar requirements:\n"
-        "- Provide all 7 category rationales with concrete evidence references.\n"
-        "- Include web_sweep_findings as structured objects by area.\n"
-        "- Include web_sweep_sources with dated URLs and relevance notes.\n"
-        "- Include citations that reference both provided docs (D*) and web sources (W*).\n"
-        "- Include verdict_one_liner always.\n"
-        "- For WAIT/PASS verdicts, include explicit why_not_invest_now and "
-        "what_would_upgrade_to_invest bullets.\n"
-        "- For INVEST verdicts, keep why_not_invest_now empty.\n"
-        "- Fill assessment_process honestly; use 'partial' if any step is incomplete.\n\n"
-        "Investor profile context:\n"
-        f"region: {profile.region}\n"
-        f"currency: {profile.currency}\n"
-        f"risk_level: {profile.inferred_risk_level}\n"
-        f"ticket_typical: {profile.ticket_typical}\n"
-        f"sectors_themes: {', '.join(profile.sectors_themes)}\n"
-        f"geo_focus: {', '.join(profile.geo_focus)}\n\n"
-        "Skill rules:\n"
-        f"{skill_text}\n\n"
-        "Rubric rules:\n"
-        f"{rubric_text}\n\n"
-        "Extraction warnings:\n"
-        f"{warnings_text}\n\n"
-        "Deal evidence:\n"
-        f"{evidence_text}\n"
-    )
-
 
 def build_default_run_id() -> str:
     local_now = datetime.now().astimezone()
@@ -177,62 +254,21 @@ def build_default_run_id() -> str:
     return local_now.strftime(f"run_%Y_%B_%d_%H-%M-%S_{zone}")
 
 
-def _run_with_retry(runner, prompt: str, cwd: Path) -> dict[str, object] | None:
+def _run_with_retry(runner, prompt: str, cwd: Path) -> tuple[dict[str, object] | None, str | None]:
+    first_error: str | None = None
     try:
-        return runner.run_assessment(prompt, cwd=cwd)
-    except Exception:  # noqa: BLE001
+        return runner.run_assessment(prompt, cwd=cwd), None
+    except Exception as exc:  # noqa: BLE001
+        first_error = str(exc)
         retry_prompt = (
             f"{prompt}\n\n"
             "RETRY INSTRUCTION: Return strict JSON only. Do not include markdown fences or extra text."
         )
         try:
-            return runner.run_assessment(retry_prompt, cwd=cwd)
-        except Exception:  # noqa: BLE001
-            return None
-
-
-def _safe_read_text(path: Path) -> str:
-    if not path.exists():
-        return ""
-    return path.read_text(encoding="utf-8", errors="ignore")
-
-
-def _build_capped_evidence_text(evidence_blocks: list[EvidenceBlock], max_chars: int) -> str:
-    parts: list[str] = []
-    used_chars = 0
-
-    for block in evidence_blocks:
-        chunk = f"SOURCE: {block.source_path.name}\n{block.text}\n\n"
-        remaining = max_chars - used_chars
-        if remaining <= 0:
-            break
-
-        if len(chunk) <= remaining:
-            parts.append(chunk)
-            used_chars += len(chunk)
-            continue
-
-        truncated_chunk = chunk[:remaining]
-        parts.append(truncated_chunk)
-        used_chars += len(truncated_chunk)
-        break
-
-    if len(parts) < len(evidence_blocks):
-        parts.append("\n[TRUNCATED] Evidence was capped due to size.")
-
-    return "".join(parts).strip()
-
-
-def _build_evidence_sources(evidence_blocks: list[EvidenceBlock]) -> list[str]:
-    seen: set[str] = set()
-    result: list[str] = []
-    for block in evidence_blocks:
-        label = str(block.source_path)
-        if label in seen:
-            continue
-        seen.add(label)
-        result.append(label)
-    return result
+            return runner.run_assessment(retry_prompt, cwd=cwd), None
+        except Exception as retry_exc:  # noqa: BLE001
+            second_error = str(retry_exc)
+            return None, f"first_attempt={first_error}; retry_attempt={second_error}"
 
 
 def _build_all_yes_process() -> dict[str, object]:
@@ -266,6 +302,16 @@ def _infer_dilution_assumption(return_scenarios: list[dict[str, object]]) -> str
     if not any(observed):
         return "Excluded."
     return "Mixed by scenario."
+
+
+def _emit_progress(
+    progress_callback: ProgressCallback | None,
+    event: str,
+    payload: dict[str, object],
+) -> None:
+    if progress_callback is None:
+        return
+    progress_callback(event, payload)
 
 
 def _parse_bool_or_none(value: object) -> bool | None:
