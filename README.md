@@ -159,6 +159,8 @@ angelcopilot batch run \
   --deals-root /path/to/deals \
   --since-days 7 \
   --assistant codex \
+  --parallelism 3 \
+  --intake-filter smart \
   --layout syndicates \
   --skill-path ~/.codex/skills/angel-copilot/SKILL.md \
   --profile .angelcopilot/profile.md \
@@ -167,6 +169,11 @@ angelcopilot batch run \
 
 You can switch to Claude CLI with `--assistant claude`.
 Batch execution always runs in skill-native mode (one AngelCopilot skill invocation per deal).
+`--parallelism` controls how many deals are assessed concurrently (default `1`).
+Start with `2-3` and increase only if your machine and assistant CLI handle it reliably.
+`--intake-filter smart` is the default and classifies folder candidates as deal vs admin/docs buckets.
+Classification uses the selected assistant (`codex` or `claude`) on folder names; if unavailable, it falls back to rules.
+Use `--intake-filter rules` to disable classifier-based filtering.
 Layout modes:
 - `syndicates` (default): treat top-level folders as containers; child folders are deals; standalone child `pdf/docx/zip` files are also deals.
 - `flat`: treat top-level folders as deal folders.
@@ -180,6 +187,7 @@ result = run_batch_job(
     deals_root="/path/to/deals",
     since_days=2,
     assistant="codex",
+    parallelism=3,
     skill_path="~/.codex/skills/angel-copilot/SKILL.md",
     profile_path=".angelcopilot/profile.md",
     out="outputs",

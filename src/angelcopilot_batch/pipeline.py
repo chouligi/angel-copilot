@@ -1,18 +1,33 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
 from angelcopilot_batch.assistant import validate_assessment_payload
 from angelcopilot_batch.intake import discover_recent_deals
-from angelcopilot_batch.models import AssessmentResult, InvestorProfile
-from angelcopilot_batch.preparation import cleanup_prepared_workspace, prepare_deal_workspace
+from angelcopilot_batch.models import AssessmentResult, DealInput, InvestorProfile
+from angelcopilot_batch.preparation import (
+    PreparedDealWorkspace,
+    cleanup_prepared_workspace,
+    prepare_deal_workspace,
+)
 from angelcopilot_batch.scoring import apply_scoring_rules
 
 DEFAULT_RUNTIME_SKILL_PATH = Path.home() / ".codex" / "skills" / "angel-copilot" / "SKILL.md"
 EXECUTION_MODE_SKILL_NATIVE = "skill_native"
 ProgressCallback = Callable[[str, dict[str, object]], None]
+
+
+@dataclass
+class PreparedDealTask:
+    deal: DealInput
+    index: int
+    total: int
+    workspace: PreparedDealWorkspace
+    prompt: str
 
 
 def run_batch_assessment(
@@ -25,15 +40,22 @@ def run_batch_assessment(
     execution_mode: str = EXECUTION_MODE_SKILL_NATIVE,
     runtime_skill_path: Path = DEFAULT_RUNTIME_SKILL_PATH,
     top_level_containers: bool = False,
+    intake_filter: str = "smart",
+    folder_classifier=None,
     progress_callback: ProgressCallback | None = None,
+    parallelism: int = 1,
 ) -> list[AssessmentResult]:
     if execution_mode != EXECUTION_MODE_SKILL_NATIVE:
         raise ValueError(f"Unsupported execution mode: {execution_mode}")
+    if parallelism < 1:
+        raise ValueError("parallelism must be >= 1")
 
     deals = discover_recent_deals(
         deals_root=deals_root,
         since_days=since_days,
         top_level_containers=top_level_containers,
+        intake_filter=intake_filter,
+        folder_classifier=folder_classifier,
     )
     resolved_profile_path = (
         profile_path.expanduser().resolve() if profile_path is not None else Path(".angelcopilot/profile.md").resolve()
@@ -50,146 +72,19 @@ def run_batch_assessment(
         },
     )
 
-    assessments: list[AssessmentResult] = []
-    for index, deal in enumerate(deals, start=1):
-        _emit_progress(
-            progress_callback,
-            "deal_started",
-            {
-                "deal_id": deal.deal_id,
-                "deal_path": str(deal.path),
-                "index": index,
-                "total": len(deals),
-                "supported_files": len(deal.supported_files),
-            },
-        )
-        prepared_workspace = prepare_deal_workspace(
-            deal_path=deal.path,
-            supported_files=deal.supported_files,
-            deal_id=deal.deal_id,
-        )
-        if not prepared_workspace.files_used:
-            _emit_progress(
-                progress_callback,
-                "deal_skipped",
-                {
-                    "deal_id": deal.deal_id,
-                    "index": index,
-                    "total": len(deals),
-                    "reason": "no_prepared_files",
-                },
-            )
-            cleanup_prepared_workspace(prepared_workspace)
-            continue
-        prompt = build_skill_native_prompt(
-            deal_id=deal.deal_id,
-            deal_path=prepared_workspace.workspace_path / "docs",
+    assessments = _run_deal_assessments(
+        prepared_tasks=_prepare_deal_tasks(
+            deals=deals,
             profile_path=resolved_profile_path,
             runtime_skill_path=resolved_runtime_skill_path,
-        )
-
-        payload, error_message = _run_with_retry(runner=runner, prompt=prompt, cwd=cwd)
-        if payload is None:
-            _emit_progress(
-                progress_callback,
-                "deal_failed",
-                {
-                    "deal_id": deal.deal_id,
-                    "index": index,
-                    "total": len(deals),
-                    "reason": "assistant_failed",
-                    "error": error_message or "",
-                },
-            )
-            cleanup_prepared_workspace(prepared_workspace)
-            continue
-
-        try:
-            normalized_payload = validate_assessment_payload(payload)
-        except Exception as exc:  # noqa: BLE001
-            _emit_progress(
-                progress_callback,
-                "deal_failed",
-                {
-                    "deal_id": deal.deal_id,
-                    "index": index,
-                    "total": len(deals),
-                    "reason": "payload_validation_failed",
-                    "error": str(exc),
-                },
-            )
-            cleanup_prepared_workspace(prepared_workspace)
-            continue
-        return_scenarios = [
-            dict(item) for item in list(normalized_payload.get("return_scenarios", [])) if isinstance(item, dict)
-        ]
-        check_size = float(profile.ticket_typical) if profile.ticket_typical > 0 else 10000.0
-        investment_basis = "profile_ticket_typical" if profile.ticket_typical > 0 else "default_10000"
-
-        assessment = AssessmentResult(
-            deal_id=str(normalized_payload["deal_id"] or deal.deal_id),
-            company_name=str(normalized_payload["company_name"]),
-            category_scores={
-                key: float(value) for key, value in dict(normalized_payload["category_scores"]).items()
-            },
-            risk_flags=[str(flag) for flag in list(normalized_payload["risk_flags"])],
-            sectors=[str(item) for item in list(normalized_payload["sectors"])],
-            geographies=[str(item) for item in list(normalized_payload["geographies"])],
-            rationale=str(normalized_payload["rationale"]),
-            citations=[
-                item
-                for item in list(normalized_payload.get("citations", []))
-                if isinstance(item, (str, dict))
-            ],
-            category_rationales={
-                key: str(value) for key, value in dict(normalized_payload.get("category_rationales", {})).items()
-            },
-            web_sweep_findings=[
-                item
-                for item in list(normalized_payload.get("web_sweep_findings", []))
-                if isinstance(item, (str, dict))
-            ],
-            web_sweep_sources=[
-                item
-                for item in list(normalized_payload.get("web_sweep_sources", []))
-                if isinstance(item, (str, dict))
-            ],
-            milestones_to_monitor=[
-                str(item) for item in list(normalized_payload.get("milestones_to_monitor", []))
-            ],
-            key_unknowns=[str(item) for item in list(normalized_payload.get("key_unknowns", []))],
-            return_scenarios=return_scenarios,
-            assessment_limitations=str(normalized_payload.get("assessment_limitations", "")),
-            assessment_process=_build_all_yes_process(),
-            verdict_one_liner=str(normalized_payload.get("verdict_one_liner", "")),
-            why_not_invest_now=[str(item) for item in list(normalized_payload.get("why_not_invest_now", []))],
-            what_would_upgrade_to_invest=[
-                str(item) for item in list(normalized_payload.get("what_would_upgrade_to_invest", []))
-            ],
-            evidence_sources=list(prepared_workspace.files_used),
-            extraction_warnings=list(prepared_workspace.warnings),
-            hypothetical_investment=check_size,
-            investment_currency=profile.currency.strip() or "USD",
-            investment_basis=investment_basis,
-            dilution_assumption=_infer_dilution_assumption(return_scenarios),
-        )
-        scored = apply_scoring_rules(assessment, profile)
-        assessments.append(scored)
-        cleanup_prepared_workspace(prepared_workspace)
-        _emit_progress(
-            progress_callback,
-            "deal_completed",
-            {
-                "deal_id": scored.deal_id,
-                "company_name": scored.company_name,
-                "index": index,
-                "total": len(deals),
-                "files_used": len(prepared_workspace.files_used),
-                "weighted_score": scored.weighted_score,
-                "verdict": scored.verdict,
-                "attention_flag": scored.attention_flag,
-            },
-        )
+            progress_callback=progress_callback,
+        ),
+        profile=profile,
+        runner=runner,
+        cwd=cwd,
+        progress_callback=progress_callback,
+        parallelism=parallelism,
+    )
 
     sorted_assessments = sorted(assessments, key=lambda item: item.weighted_score, reverse=True)
     _emit_progress(
@@ -202,6 +97,257 @@ def run_batch_assessment(
         },
     )
     return sorted_assessments
+
+
+def _run_deal_assessments(
+    prepared_tasks: list[PreparedDealTask],
+    profile: InvestorProfile,
+    runner,
+    cwd: Path,
+    progress_callback: ProgressCallback | None,
+    parallelism: int,
+) -> list[AssessmentResult]:
+    assessments: list[AssessmentResult] = []
+    if parallelism == 1 or len(prepared_tasks) <= 1:
+        for prepared_task in prepared_tasks:
+            scored = _assess_prepared_deal(
+                prepared_task=prepared_task,
+                profile=profile,
+                runner=runner,
+                cwd=cwd,
+                progress_callback=progress_callback,
+            )
+            if scored is not None:
+                assessments.append(scored)
+        return assessments
+
+    max_workers = min(parallelism, len(prepared_tasks))
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(
+                _assess_prepared_deal,
+                prepared_task=prepared_task,
+                profile=profile,
+                runner=runner,
+                cwd=cwd,
+                progress_callback=progress_callback,
+            ): prepared_task
+            for prepared_task in prepared_tasks
+        }
+        for future in as_completed(futures):
+            prepared_task = futures[future]
+            try:
+                scored = future.result()
+            except Exception as exc:  # noqa: BLE001
+                _emit_progress(
+                    progress_callback,
+                    "deal_failed",
+                    {
+                        "deal_id": prepared_task.deal.deal_id,
+                        "index": prepared_task.index,
+                        "total": prepared_task.total,
+                        "reason": "worker_failed",
+                        "error": str(exc),
+                    },
+                )
+                continue
+            if scored is not None:
+                assessments.append(scored)
+    return assessments
+
+
+def _prepare_deal_tasks(
+    deals: list[DealInput],
+    profile_path: Path,
+    runtime_skill_path: Path,
+    progress_callback: ProgressCallback | None,
+) -> list[PreparedDealTask]:
+    prepared_tasks: list[PreparedDealTask] = []
+    total = len(deals)
+    for index, deal in enumerate(deals, start=1):
+        _emit_progress(
+            progress_callback,
+            "deal_started",
+            {
+                "deal_id": deal.deal_id,
+                "deal_path": str(deal.path),
+                "index": index,
+                "total": total,
+                "supported_files": len(deal.supported_files),
+            },
+        )
+        workspace = prepare_deal_workspace(
+            deal_path=deal.path,
+            supported_files=deal.supported_files,
+            deal_id=deal.deal_id,
+        )
+        if not workspace.files_used:
+            _emit_progress(
+                progress_callback,
+                "deal_skipped",
+                {
+                    "deal_id": deal.deal_id,
+                    "index": index,
+                    "total": total,
+                    "reason": "no_prepared_files",
+                },
+            )
+            cleanup_prepared_workspace(workspace)
+            continue
+
+        prompt = build_skill_native_prompt(
+            deal_id=deal.deal_id,
+            deal_path=workspace.workspace_path / "docs",
+            profile_path=profile_path,
+            runtime_skill_path=runtime_skill_path,
+        )
+        prepared_tasks.append(
+            PreparedDealTask(
+                deal=deal,
+                index=index,
+                total=total,
+                workspace=workspace,
+                prompt=prompt,
+            )
+        )
+        _emit_progress(
+            progress_callback,
+            "deal_prepared",
+            {
+                "deal_id": deal.deal_id,
+                "index": index,
+                "total": total,
+                "files_used": len(workspace.files_used),
+                "warnings": len(workspace.warnings),
+            },
+        )
+    return prepared_tasks
+
+
+def _assess_prepared_deal(
+    prepared_task: PreparedDealTask,
+    profile: InvestorProfile,
+    runner,
+    cwd: Path,
+    progress_callback: ProgressCallback | None,
+) -> AssessmentResult | None:
+    deal = prepared_task.deal
+    prepared_workspace = prepared_task.workspace
+    try:
+        payload, error_message = _run_with_retry(runner=runner, prompt=prepared_task.prompt, cwd=cwd)
+        if payload is None:
+            _emit_progress(
+                progress_callback,
+                "deal_failed",
+                {
+                    "deal_id": deal.deal_id,
+                    "index": prepared_task.index,
+                    "total": prepared_task.total,
+                    "reason": "assistant_failed",
+                    "error": error_message or "",
+                },
+            )
+            return None
+
+        try:
+            normalized_payload = validate_assessment_payload(payload)
+        except Exception as exc:  # noqa: BLE001
+            _emit_progress(
+                progress_callback,
+                "deal_failed",
+                {
+                    "deal_id": deal.deal_id,
+                    "index": prepared_task.index,
+                    "total": prepared_task.total,
+                    "reason": "payload_validation_failed",
+                    "error": str(exc),
+                },
+            )
+            return None
+
+        scored = _build_scored_assessment(
+            deal_id=deal.deal_id,
+            normalized_payload=normalized_payload,
+            profile=profile,
+            evidence_sources=prepared_workspace.files_used,
+            extraction_warnings=prepared_workspace.warnings,
+        )
+        _emit_progress(
+            progress_callback,
+            "deal_completed",
+            {
+                "deal_id": scored.deal_id,
+                "company_name": scored.company_name,
+                "index": prepared_task.index,
+                "total": prepared_task.total,
+                "files_used": len(prepared_workspace.files_used),
+                "weighted_score": scored.weighted_score,
+                "verdict": scored.verdict,
+                "attention_flag": scored.attention_flag,
+            },
+        )
+        return scored
+    finally:
+        cleanup_prepared_workspace(prepared_workspace)
+
+
+def _build_scored_assessment(
+    deal_id: str,
+    normalized_payload: dict[str, object],
+    profile: InvestorProfile,
+    evidence_sources: list[str],
+    extraction_warnings: list[str],
+) -> AssessmentResult:
+    return_scenarios = [
+        dict(item) for item in list(normalized_payload.get("return_scenarios", [])) if isinstance(item, dict)
+    ]
+    check_size = float(profile.ticket_typical) if profile.ticket_typical > 0 else 10000.0
+    investment_basis = "profile_ticket_typical" if profile.ticket_typical > 0 else "default_10000"
+
+    assessment = AssessmentResult(
+        deal_id=str(normalized_payload["deal_id"] or deal_id),
+        company_name=str(normalized_payload["company_name"]),
+        category_scores={key: float(value) for key, value in dict(normalized_payload["category_scores"]).items()},
+        risk_flags=[str(flag) for flag in list(normalized_payload["risk_flags"])],
+        sectors=[str(item) for item in list(normalized_payload["sectors"])],
+        geographies=[str(item) for item in list(normalized_payload["geographies"])],
+        rationale=str(normalized_payload["rationale"]),
+        citations=[
+            item
+            for item in list(normalized_payload.get("citations", []))
+            if isinstance(item, (str, dict))
+        ],
+        category_rationales={
+            key: str(value) for key, value in dict(normalized_payload.get("category_rationales", {})).items()
+        },
+        web_sweep_findings=[
+            item
+            for item in list(normalized_payload.get("web_sweep_findings", []))
+            if isinstance(item, (str, dict))
+        ],
+        web_sweep_sources=[
+            item
+            for item in list(normalized_payload.get("web_sweep_sources", []))
+            if isinstance(item, (str, dict))
+        ],
+        milestones_to_monitor=[str(item) for item in list(normalized_payload.get("milestones_to_monitor", []))],
+        key_unknowns=[str(item) for item in list(normalized_payload.get("key_unknowns", []))],
+        return_scenarios=return_scenarios,
+        assessment_limitations=str(normalized_payload.get("assessment_limitations", "")),
+        assessment_process=_build_all_yes_process(),
+        verdict_one_liner=str(normalized_payload.get("verdict_one_liner", "")),
+        why_not_invest_now=[str(item) for item in list(normalized_payload.get("why_not_invest_now", []))],
+        what_would_upgrade_to_invest=[
+            str(item) for item in list(normalized_payload.get("what_would_upgrade_to_invest", []))
+        ],
+        evidence_sources=list(evidence_sources),
+        extraction_warnings=list(extraction_warnings),
+        hypothetical_investment=check_size,
+        investment_currency=profile.currency.strip() or "USD",
+        investment_basis=investment_basis,
+        dilution_assumption=_infer_dilution_assumption(return_scenarios),
+    )
+    return apply_scoring_rules(assessment, profile)
 
 
 def build_skill_native_prompt(

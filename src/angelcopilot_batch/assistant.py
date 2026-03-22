@@ -58,7 +58,48 @@ class ClaudeRunner:
         return validate_assessment_payload(payload)
 
 
-def parse_assessment_json(raw_output: str) -> dict[str, object]:
+class CodexIntakeClassifier:
+    def __init__(self, cwd: Path | None = None) -> None:
+        self.cwd = cwd or Path.cwd()
+
+    def is_deal_folder(self, folder_name: str, parent_name: str | None = None) -> bool:
+        prompt = build_intake_classification_prompt(folder_name=folder_name, parent_name=parent_name)
+        command = ["codex", "--search", "exec", "--skip-git-repo-check", "-C", str(self.cwd), "-"]
+        result = subprocess.run(command, input=prompt, capture_output=True, text=True, check=False)
+        if result.returncode != 0:
+            raise RuntimeError(f"Codex intake classification failed: {result.stderr.strip()}")
+        payload = parse_json_object(result.stdout)
+        return bool(payload.get("is_deal_folder", False))
+
+
+class ClaudeIntakeClassifier:
+    def __init__(self, cwd: Path | None = None) -> None:
+        self.cwd = cwd or Path.cwd()
+
+    def is_deal_folder(self, folder_name: str, parent_name: str | None = None) -> bool:
+        prompt = build_intake_classification_prompt(folder_name=folder_name, parent_name=parent_name)
+        command = ["claude", "-p"]
+        result = subprocess.run(command, input=prompt, capture_output=True, text=True, check=False, cwd=str(self.cwd))
+        if result.returncode != 0:
+            raise RuntimeError(f"Claude intake classification failed: {result.stderr.strip()}")
+        payload = parse_json_object(result.stdout)
+        return bool(payload.get("is_deal_folder", False))
+
+
+def build_intake_classification_prompt(folder_name: str, parent_name: str | None) -> str:
+    parent_label = parent_name or "-"
+    return (
+        "Classify whether this folder name likely represents a startup deal/company folder "
+        "or an administrative/document bucket.\n"
+        "Return strict JSON only with keys:\n"
+        '{"is_deal_folder": true|false, "confidence": 0-1, "reason": "..."}\n'
+        "Guidance: company/deal names should be true; folders like closing/legal/documents/admin should be false.\n"
+        f"Folder name: {folder_name}\n"
+        f"Parent folder: {parent_label}\n"
+    )
+
+
+def parse_json_object(raw_output: str) -> dict[str, object]:
     cleaned = raw_output.strip()
     try:
         parsed = json.loads(cleaned)
@@ -69,13 +110,21 @@ def parse_assessment_json(raw_output: str) -> dict[str, object]:
 
     fenced_match = re.search(r"```json\s*(\{.*\})\s*```", cleaned, flags=re.DOTALL)
     if fenced_match:
-        return json.loads(fenced_match.group(1))
+        parsed = json.loads(fenced_match.group(1))
+        if isinstance(parsed, dict):
+            return parsed
 
     bracket_match = re.search(r"(\{.*\})", cleaned, flags=re.DOTALL)
     if bracket_match:
-        return json.loads(bracket_match.group(1))
+        parsed = json.loads(bracket_match.group(1))
+        if isinstance(parsed, dict):
+            return parsed
 
-    raise ValueError("Assistant output did not contain valid JSON")
+    raise ValueError("Assistant output did not contain valid JSON object")
+
+
+def parse_assessment_json(raw_output: str) -> dict[str, object]:
+    return parse_json_object(raw_output)
 
 
 def validate_assessment_payload(payload: dict[str, object]) -> dict[str, object]:
@@ -167,6 +216,17 @@ def build_assistant_runner(name: str):
         _require_command("claude")
         return ClaudeRunner()
     raise ValueError(f"Unsupported assistant runner: {name}")
+
+
+def build_intake_classifier(name: str, cwd: Path | None = None):
+    normalized = name.strip().lower()
+    if normalized == "codex":
+        _require_command("codex")
+        return CodexIntakeClassifier(cwd=cwd)
+    if normalized == "claude":
+        _require_command("claude")
+        return ClaudeIntakeClassifier(cwd=cwd)
+    return None
 
 
 def _as_list(value: object) -> list[object]:

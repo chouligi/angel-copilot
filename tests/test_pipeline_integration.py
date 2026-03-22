@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
+import threading
 
+import pytest
 from angelcopilot_batch.models import InvestorProfile
 from angelcopilot_batch.pipeline import run_batch_assessment
 
@@ -75,6 +78,63 @@ class FailingRunner:
         del prompt
         del cwd
         raise RuntimeError("intentional failure")
+
+
+class ThreadTrackingRunner:
+    def __init__(self) -> None:
+        self.thread_ids: set[int] = set()
+        self.lock = threading.Lock()
+
+    def run_assessment(self, prompt: str, cwd: Path) -> dict[str, object]:
+        del cwd
+        deal_id_match = re.search(r"Deal ID: ([^\n]+)", prompt)
+        deal_id = deal_id_match.group(1).strip() if deal_id_match else "unknown"
+        with self.lock:
+            self.thread_ids.add(threading.get_ident())
+        return {
+            "deal_id": deal_id,
+            "company_name": deal_id.replace("_", " ").title(),
+            "category_scores": {
+                "Team": 4.1,
+                "Market": 4.1,
+                "Product": 4.1,
+                "Traction": 4.1,
+                "Unit Economics": 4.1,
+                "Defensibility": 4.1,
+                "Terms": 4.1,
+            },
+            "risk_flags": [],
+            "sectors": ["AI"],
+            "geographies": ["Europe"],
+            "rationale": "Good",
+            "citations": [],
+            "category_rationales": {
+                "Team": "Strong team.",
+                "Market": "Large market.",
+                "Product": "Useful product.",
+                "Traction": "Early traction.",
+                "Unit Economics": "Plausible economics.",
+                "Defensibility": "Some moat.",
+                "Terms": "Neutral terms.",
+            },
+            "web_sweep_findings": ["Finding"],
+            "web_sweep_sources": ["https://example.com"],
+            "milestones_to_monitor": ["Milestone"],
+            "key_unknowns": ["Unknown"],
+            "return_scenarios": [
+                {"scenario": "Pessimistic", "multiple": "0.3x", "probability": "30%", "rationale": "Low"},
+                {"scenario": "Base", "multiple": "3x", "probability": "50%", "rationale": "Medium"},
+                {"scenario": "Optimistic", "multiple": "12x", "probability": "20%", "rationale": "High"},
+            ],
+            "assessment_limitations": "Fixture data only.",
+            "assessment_process": {
+                "single_deal_equivalent": "yes",
+                "used_full_rubric": True,
+                "performed_web_sweep": True,
+                "reconciled_docs_with_web": True,
+                "built_three_case_return_model": True,
+            },
+        }
 
 
 def test_run_batch_assessment__processes_recent_deals_end_to_end(tmp_path: Path) -> None:
@@ -184,3 +244,44 @@ def test_run_batch_assessment__emits_deal_failed_when_runner_errors(tmp_path: Pa
     failed_events = [payload for event, payload in events if event == "deal_failed"]
     assert len(failed_events) == 1
     assert failed_events[0]["reason"] == "assistant_failed"
+
+
+def test_run_batch_assessment__parallelism_runs_deals_on_multiple_threads(tmp_path: Path) -> None:
+    deals_root = tmp_path / "deals"
+    for deal_id in ("deal_a", "deal_b"):
+        deal_folder = deals_root / deal_id
+        deal_folder.mkdir(parents=True)
+        (deal_folder / "memo.txt").write_text("AI startup with traction", encoding="utf-8")
+
+    profile = InvestorProfile(sectors_themes=["AI"], geo_focus=["Europe"])
+    runner = ThreadTrackingRunner()
+
+    results = run_batch_assessment(
+        deals_root=deals_root,
+        since_days=7,
+        profile=profile,
+        runner=runner,
+        cwd=tmp_path,
+        parallelism=2,
+    )
+
+    assert len(results) == 2
+    assert len(runner.thread_ids) >= 2
+
+
+def test_run_batch_assessment__parallelism_less_than_one_raises(tmp_path: Path) -> None:
+    deals_root = tmp_path / "deals"
+    deal_folder = deals_root / "deal_a"
+    deal_folder.mkdir(parents=True)
+    (deal_folder / "memo.txt").write_text("AI startup with traction", encoding="utf-8")
+
+    profile = InvestorProfile(sectors_themes=["AI"], geo_focus=["Europe"])
+    with pytest.raises(ValueError, match="parallelism must be >= 1"):
+        run_batch_assessment(
+            deals_root=deals_root,
+            since_days=7,
+            profile=profile,
+            runner=FakeRunner(),
+            cwd=tmp_path,
+            parallelism=0,
+        )

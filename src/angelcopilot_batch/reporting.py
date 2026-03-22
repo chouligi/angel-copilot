@@ -174,7 +174,7 @@ def _render_markdown(
             f"{assessment.verdict} | {attention} | {assessment.attention_reason} |"
         )
 
-    lines.extend(["", "## Appendix: Individual Assessments", ""])
+    lines.extend(["", "## Individual Assessments", ""])
 
     for index, assessment in enumerate(assessments, start=1):
         lines.extend(
@@ -226,7 +226,11 @@ def _render_markdown(
         else:
             lines.append("- No web-sweep findings provided.")
 
-        lines.extend(["", "#### Web Sweep Sources", ""])
+        lines.extend(["", "#### External/Web Sources (Web Sweep)", ""])
+        lines.append(
+            "_These are external references gathered during web sweep (links/articles/pages), not local deal files._"
+        )
+        lines.append("")
         if assessment.web_sweep_sources:
             rows, columns = _build_web_source_rows(assessment.web_sweep_sources)
             lines.extend(
@@ -286,32 +290,40 @@ def _render_markdown(
         else:
             lines.append("- No return scenarios provided.")
 
-        lines.extend(["", "#### Assessment Limitations", ""])
+        lines.extend(["", "#### Final Verdict", ""])
+        lines.extend(_render_final_verdict_markdown_lines(assessment))
+        lines.extend(["", "#### Assessment Evidence Appendix", ""])
+
+        lines.extend(["##### Assessment Limitations", ""])
         lines.append(assessment.assessment_limitations or "- No limitations provided.")
 
-        lines.extend(["", "#### Files Used as Evidence", ""])
+        lines.extend(["", "##### Input Documents Processed (Local Files)", ""])
+        lines.append(
+            "_These are local files ingested from the deal folder, including files extracted from zip archives._"
+        )
+        lines.append("")
         if assessment.evidence_sources:
             for source in assessment.evidence_sources:
                 lines.append(f"- {_markdown_cell(source)}")
         else:
             lines.append("- No evidence files recorded.")
 
-        lines.extend(["", "#### Evidence Preparation Warnings", ""])
+        lines.extend(["", "##### Evidence Preparation Warnings", ""])
         if assessment.extraction_warnings:
             for warning in assessment.extraction_warnings:
                 lines.append(f"- {_markdown_cell(warning)}")
         else:
             lines.append("- No evidence preparation warnings.")
 
-        lines.extend(["#### Sources", ""])
+        lines.extend(["", "##### Assessment Citations (Assistant Output)", ""])
+        lines.append("_These are references cited by the assistant in the assessment narrative._")
+        lines.append("")
         if assessment.citations:
             for citation in assessment.citations:
                 lines.append(f"- {_format_markdown_detail(citation)}")
         else:
             lines.append("- No citations provided.")
 
-        lines.extend(["", "#### Final Verdict", ""])
-        lines.extend(_render_final_verdict_markdown_lines(assessment))
         lines.append("")
 
     lines.extend(
@@ -455,7 +467,7 @@ def _render_html(assessments: list[AssessmentResult], run_id: str) -> str:
         f"<tbody>{overview_rows_html}</tbody></table>"
         "</section>"
         "<section class='page appendix page-break'>"
-        "<h2>Appendix: Individual Assessments</h2>"
+        "<h2>Individual Assessments</h2>"
         f"{appendix_sections_html}"
         "</section>"
         f"<footer class='footer'><strong>&copy; {_copyright_year()} George Chouliaras</strong>"
@@ -596,7 +608,9 @@ def _render_appendix_section_html(index: int, assessment: AssessmentResult) -> s
         f"<div class='rationale'>{escape(assessment.rationale or 'No rationale provided.')}</div>"
         "<h3>Web Sweep Findings</h3>"
         f"<ul>{web_findings_rows}</ul>"
-        "<h3>Web Sweep Sources</h3>"
+        "<h3>External/Web Sources (Web Sweep)</h3>"
+        "<p class='context-note'>These are external references gathered during web sweep "
+        "(links/articles/pages), not local deal files.</p>"
         f"{web_sources_table_html}"
         "<h3>Milestones to Monitor</h3>"
         f"<ul>{milestones_items}</ul>"
@@ -610,16 +624,20 @@ def _render_appendix_section_html(index: int, assessment: AssessmentResult) -> s
         "<table><thead><tr><th>Scenario</th><th>Multiple</th><th>Probability</th><th>Projected Value</th>"
         "<th>Potential Gain/Loss</th><th>Rationale</th></tr></thead>"
         f"<tbody>{return_rows_with_values}</tbody></table>"
-        "<h3>Assessment Limitations</h3>"
-        f"<div class='rationale'>{escape(assessment.assessment_limitations or 'No limitations provided.')}</div>"
-        "<h3>Files Used as Evidence</h3>"
-        f"<ul>{evidence_items}</ul>"
-        "<h3>Evidence Preparation Warnings</h3>"
-        f"<ul>{warning_items}</ul>"
-        "<h3>Sources</h3>"
-        f"<ul>{citation_items}</ul>"
         "<h3>Final Verdict</h3>"
         f"<div class='rationale'>{_render_final_verdict_html(assessment)}</div>"
+        "<h3>Assessment Evidence Appendix</h3>"
+        "<h4>Assessment Limitations</h4>"
+        f"<div class='rationale'>{escape(assessment.assessment_limitations or 'No limitations provided.')}</div>"
+        "<h4>Input Documents Processed (Local Files)</h4>"
+        "<p class='context-note'>These are local files ingested from the deal folder, including files "
+        "extracted from zip archives.</p>"
+        f"<ul>{evidence_items}</ul>"
+        "<h4>Evidence Preparation Warnings</h4>"
+        f"<ul>{warning_items}</ul>"
+        "<h4>Assessment Citations (Assistant Output)</h4>"
+        "<p class='context-note'>These are references cited by the assistant in the assessment narrative.</p>"
+        f"<ul>{citation_items}</ul>"
         "</article>"
     )
 

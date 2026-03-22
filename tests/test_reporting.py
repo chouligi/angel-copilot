@@ -54,19 +54,27 @@ def test_write_batch_outputs__writes_md_csv_json(tmp_path: Path) -> None:
     html_text = output_paths.html_path.read_text(encoding="utf-8")
 
     assert "## Executive Overview" in markdown_text
-    assert "## Appendix: Individual Assessments" in markdown_text
+    assert "## Individual Assessments" in markdown_text
     assert "### 1. Acme (`d1`)" in markdown_text
     assert "#### Final Verdict" in markdown_text
-    assert "#### Files Used as Evidence" in markdown_text
+    assert "#### Assessment Evidence Appendix" in markdown_text
+    assert "##### Input Documents Processed (Local Files)" in markdown_text
     assert "/tmp/source/archive.zip!inner/memo.txt" in markdown_text
-    assert "#### Evidence Preparation Warnings" in markdown_text
+    assert "##### Evidence Preparation Warnings" in markdown_text
+    assert "#### External/Web Sources (Web Sweep)" in markdown_text
+    assert "##### Assessment Citations (Assistant Output)" in markdown_text
+    assert markdown_text.index("#### Final Verdict") < markdown_text.index("#### Assessment Evidence Appendix")
     assert "Why not INVEST now:" in markdown_text
     assert "What would upgrade to INVEST:" in markdown_text
     assert "AngelCopilot Batch Report" in html_text
-    assert "Appendix: Individual Assessments" in html_text
-    assert "Files Used as Evidence" in html_text
+    assert "Individual Assessments" in html_text
+    assert "Input Documents Processed (Local Files)" in html_text
     assert "Evidence Preparation Warnings" in html_text
+    assert "External/Web Sources (Web Sweep)" in html_text
+    assert "Assessment Citations (Assistant Output)" in html_text
     assert "Final Verdict" in html_text
+    assert "Assessment Evidence Appendix" in html_text
+    assert html_text.index("Final Verdict") < html_text.index("Assessment Evidence Appendix")
     assert "Why not INVEST now" in html_text
     assert "data:image/png;base64" in html_text
 

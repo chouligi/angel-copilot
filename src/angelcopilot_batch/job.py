@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from angelcopilot_batch.assistant import build_assistant_runner
+from angelcopilot_batch.assistant import build_assistant_runner, build_intake_classifier
 from angelcopilot_batch.models import AssessmentResult, BatchOutputPaths
 from angelcopilot_batch.pipeline import (
     EXECUTION_MODE_SKILL_NATIVE,
@@ -34,7 +34,9 @@ def run_batch_job(
     out: str | Path = "outputs",
     skill_path: str | Path = DEFAULT_RUNTIME_SKILL_PATH,
     top_level_containers: bool = True,
+    intake_filter: str = "smart",
     include_pdf: bool = True,
+    parallelism: int = 1,
     run_id: str | None = None,
     cwd: str | Path | None = None,
     logger: LogFn | None = None,
@@ -48,6 +50,12 @@ def run_batch_job(
 
     profile = load_investor_profile(resolved_profile_path)
     effective_runner = runner or build_assistant_runner(assistant)
+    intake_classifier = None
+    if intake_filter == "smart":
+        try:
+            intake_classifier = build_intake_classifier(assistant, cwd=resolved_cwd)
+        except RuntimeError:
+            intake_classifier = None
     log = logger or _default_logger
 
     assessments = run_batch_assessment(
@@ -60,7 +68,10 @@ def run_batch_job(
         execution_mode=EXECUTION_MODE_SKILL_NATIVE,
         runtime_skill_path=resolved_skill_path,
         top_level_containers=top_level_containers,
+        intake_filter=intake_filter,
+        folder_classifier=intake_classifier,
         progress_callback=_build_progress_callback(log),
+        parallelism=parallelism,
     )
 
     effective_run_id = run_id or build_default_run_id()
@@ -99,6 +110,13 @@ def _build_progress_callback(logger: LogFn) -> Callable[[str, dict[str, object]]
             logger(
                 f"{prefix} [{payload.get('index')}/{payload.get('total')}] "
                 f"starting deal '{payload.get('deal_id')}' (files={payload.get('supported_files')})"
+            )
+            return
+        if event == "deal_prepared":
+            logger(
+                f"{prefix} [{payload.get('index')}/{payload.get('total')}] "
+                f"prepared deal '{payload.get('deal_id')}' "
+                f"(files_used={payload.get('files_used')}, warnings={payload.get('warnings')})"
             )
             return
         if event == "deal_completed":

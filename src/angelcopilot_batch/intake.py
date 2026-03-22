@@ -1,12 +1,42 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import re
 
 from angelcopilot_batch.models import DealInput
 
 SUPPORTED_DOC_EXTENSIONS = {".txt", ".md", ".pdf", ".docx", ".zip"}
 STANDALONE_DEAL_FILE_EXTENSIONS = {".pdf", ".docx", ".zip"}
+EXCLUDED_DEAL_FOLDER_NAMES = {
+    "closing documents",
+    "closing document",
+    "closing docs",
+    "legal documents",
+    "legal document",
+    "legal docs",
+}
+LIKELY_ADMIN_FOLDER_TOKENS = {
+    "admin",
+    "closing",
+    "doc",
+    "docs",
+    "document",
+    "documents",
+    "legal",
+    "agreement",
+    "agreements",
+    "subscription",
+    "wire",
+    "signed",
+    "signature",
+    "data room",
+}
+INTAKE_FILTER_SMART = "smart"
+INTAKE_FILTER_RULES = "rules"
+
+FolderClassifier = Callable[[str, str | None], bool] | object
 
 
 def discover_recent_deals(
@@ -14,16 +44,29 @@ def discover_recent_deals(
     since_days: int = 7,
     now: datetime | None = None,
     top_level_containers: bool = False,
+    intake_filter: str = INTAKE_FILTER_SMART,
+    folder_classifier: FolderClassifier | None = None,
 ) -> list[DealInput]:
     if not deals_root.exists() or not deals_root.is_dir():
         return []
+    if intake_filter not in {INTAKE_FILTER_SMART, INTAKE_FILTER_RULES}:
+        raise ValueError(f"Unsupported intake_filter: {intake_filter}")
 
     now_utc = now or datetime.now(timezone.utc)
     cutoff = now_utc - timedelta(days=since_days)
     discovered: list[DealInput] = []
+    classifier_cache: dict[tuple[str, str | None], bool] = {}
 
     candidates = _discover_deal_candidates(deals_root, top_level_containers=top_level_containers)
     for candidate in candidates:
+        if candidate.is_dir() and not _include_folder_candidate(
+            candidate=candidate,
+            intake_filter=intake_filter,
+            folder_classifier=folder_classifier,
+            classifier_cache=classifier_cache,
+        ):
+            continue
+
         supported_files = _collect_supported_files_for_candidate(candidate)
         if not supported_files:
             continue
@@ -142,3 +185,57 @@ def _has_supported_files_recursive(folder: Path) -> bool:
 def _latest_modified_timestamp(folder: Path, files: list[Path]) -> datetime:
     timestamps = [folder.stat().st_mtime, *[file_path.stat().st_mtime for file_path in files]]
     return datetime.fromtimestamp(max(timestamps), tz=timezone.utc)
+
+
+def _include_folder_candidate(
+    candidate: Path,
+    intake_filter: str,
+    folder_classifier: FolderClassifier | None,
+    classifier_cache: dict[tuple[str, str | None], bool],
+) -> bool:
+    parent_name = candidate.parent.name if candidate.parent != candidate else None
+    folder_name = candidate.name
+    cache_key = (folder_name.casefold(), parent_name.casefold() if parent_name else None)
+    if cache_key in classifier_cache:
+        return classifier_cache[cache_key]
+
+    if intake_filter == INTAKE_FILTER_RULES:
+        decision = not _is_likely_admin_folder(folder_name)
+        classifier_cache[cache_key] = decision
+        return decision
+
+    if folder_classifier is None:
+        decision = not _is_likely_admin_folder(folder_name)
+        classifier_cache[cache_key] = decision
+        return decision
+
+    try:
+        decision = bool(_run_folder_classifier(folder_classifier, folder_name, parent_name))
+    except Exception:  # noqa: BLE001
+        decision = not _is_likely_admin_folder(folder_name)
+    classifier_cache[cache_key] = decision
+    return decision
+
+
+def _is_excluded_deal_folder(folder_name: str) -> bool:
+    normalized = re.sub(r"[\W_]+", " ", folder_name.strip().lower()).strip()
+    return normalized in EXCLUDED_DEAL_FOLDER_NAMES
+
+
+def _is_likely_admin_folder(folder_name: str) -> bool:
+    normalized = re.sub(r"[\W_]+", " ", folder_name.strip().lower()).strip()
+    if not normalized:
+        return True
+    if _is_excluded_deal_folder(folder_name):
+        return True
+    token_hits = sum(1 for token in LIKELY_ADMIN_FOLDER_TOKENS if token in normalized)
+    return token_hits >= 1
+
+
+def _run_folder_classifier(folder_classifier: FolderClassifier, folder_name: str, parent_name: str | None) -> bool:
+    if callable(folder_classifier):
+        return bool(folder_classifier(folder_name, parent_name))
+    classify = getattr(folder_classifier, "is_deal_folder", None)
+    if callable(classify):
+        return bool(classify(folder_name, parent_name))
+    raise TypeError("folder_classifier must be callable or expose is_deal_folder(folder_name, parent_name)")

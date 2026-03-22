@@ -7,6 +7,23 @@ import zipfile
 from angelcopilot_batch.intake import discover_recent_deals
 
 
+class MappingClassifier:
+    def __init__(self, mapping: dict[str, bool]) -> None:
+        self.mapping = mapping
+        self.calls: list[tuple[str, str | None]] = []
+
+    def is_deal_folder(self, folder_name: str, parent_name: str | None = None) -> bool:
+        self.calls.append((folder_name, parent_name))
+        return self.mapping.get(folder_name, True)
+
+
+class FailingClassifier:
+    def is_deal_folder(self, folder_name: str, parent_name: str | None = None) -> bool:
+        del folder_name
+        del parent_name
+        raise RuntimeError("classifier unavailable")
+
+
 def test_discover_recent_deals__returns_only_recent_deals(tmp_path: Path) -> None:
     deals_root = tmp_path / "deals"
     deal_recent = deals_root / "recent_ai_deal"
@@ -145,3 +162,62 @@ def test_discover_recent_deals__does_not_emit_top_level_container_as_deal(tmp_pa
 
     assert "syndicate_container" not in deal_ids
     assert "Deal D_03_22_2026" in deal_ids
+
+
+def test_discover_recent_deals__ignores_closing_documents_folder_candidate(tmp_path: Path) -> None:
+    deals_root = tmp_path / "single_syndicate"
+    closing_documents = deals_root / "Closing documents"
+    deal_folder = deals_root / "Beyond Reach Labs"
+    closing_documents.mkdir(parents=True)
+    deal_folder.mkdir(parents=True)
+    (closing_documents / "signed_terms.pdf").write_bytes(b"%PDF-1.4\n%test\n")
+    (deal_folder / "memo.txt").write_text("actual deal docs", encoding="utf-8")
+
+    deals = discover_recent_deals(deals_root=deals_root, since_days=7, top_level_containers=False)
+    deal_ids = {deal.deal_id for deal in deals}
+
+    assert "Closing documents" not in deal_ids
+    assert deal_ids == {"Beyond Reach Labs"}
+
+
+def test_discover_recent_deals__smart_filter_uses_classifier_for_folder_candidates(tmp_path: Path) -> None:
+    deals_root = tmp_path / "single_syndicate"
+    closing_documents = deals_root / "Closing documents"
+    deal_folder = deals_root / "Beyond Reach Labs"
+    closing_documents.mkdir(parents=True)
+    deal_folder.mkdir(parents=True)
+    (closing_documents / "signed_terms.pdf").write_bytes(b"%PDF-1.4\n%test\n")
+    (deal_folder / "memo.txt").write_text("actual deal docs", encoding="utf-8")
+    classifier = MappingClassifier({"Closing documents": False, "Beyond Reach Labs": True})
+
+    deals = discover_recent_deals(
+        deals_root=deals_root,
+        since_days=7,
+        top_level_containers=False,
+        intake_filter="smart",
+        folder_classifier=classifier,
+    )
+
+    assert {deal.deal_id for deal in deals} == {"Beyond Reach Labs"}
+    assert ("Closing documents", "single_syndicate") in classifier.calls
+    assert ("Beyond Reach Labs", "single_syndicate") in classifier.calls
+
+
+def test_discover_recent_deals__smart_filter_falls_back_to_heuristic_when_classifier_fails(tmp_path: Path) -> None:
+    deals_root = tmp_path / "single_syndicate"
+    closing_documents = deals_root / "Closing documents"
+    deal_folder = deals_root / "Beyond Reach Labs"
+    closing_documents.mkdir(parents=True)
+    deal_folder.mkdir(parents=True)
+    (closing_documents / "signed_terms.pdf").write_bytes(b"%PDF-1.4\n%test\n")
+    (deal_folder / "memo.txt").write_text("actual deal docs", encoding="utf-8")
+
+    deals = discover_recent_deals(
+        deals_root=deals_root,
+        since_days=7,
+        top_level_containers=False,
+        intake_filter="smart",
+        folder_classifier=FailingClassifier(),
+    )
+
+    assert {deal.deal_id for deal in deals} == {"Beyond Reach Labs"}

@@ -47,7 +47,9 @@ def _run_batch(args: argparse.Namespace) -> int:
         out=args.out,
         skill_path=args.skill_path,
         top_level_containers=top_level_containers,
+        intake_filter=args.intake_filter,
         include_pdf=args.pdf,
+        parallelism=args.parallelism,
         run_id=args.run_id or None,
         cwd=Path.cwd(),
         logger=print,
@@ -63,6 +65,7 @@ def _validate_batch(args: argparse.Namespace) -> int:
         deals_root=deals_root,
         since_days=args.since_days,
         top_level_containers=(args.layout == "syndicates"),
+        intake_filter=args.intake_filter,
     )
 
     print(f"Detected deals: {len(deals)}")
@@ -122,34 +125,128 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="AngelCopilot batch runner")
     subparsers = parser.add_subparsers(dest="command")
 
-    subparsers.add_parser("setup", help="Install local browser dependency for PDF generation")
+    subparsers.add_parser(
+        "setup",
+        help="Install local browser dependency for PDF generation",
+        description="Install Chromium via Playwright for PDF report rendering.",
+    )
 
-    batch_parser = subparsers.add_parser("batch", help="Batch commands")
+    batch_parser = subparsers.add_parser(
+        "batch",
+        help="Batch commands",
+        description="Run, validate, or rerender AngelCopilot batch outputs.",
+    )
     batch_subparsers = batch_parser.add_subparsers(dest="batch_command")
 
-    run_parser = batch_subparsers.add_parser("run", help="Run weekly batch assessments")
-    run_parser.add_argument("--deals-root", required=True)
-    run_parser.add_argument("--since-days", type=int, default=7)
-    run_parser.add_argument("--assistant", choices=["codex", "claude"], default="codex")
-    run_parser.add_argument("--layout", choices=["syndicates", "flat"], default="syndicates")
-    run_parser.add_argument("--skill-path", default="~/.codex/skills/angel-copilot/SKILL.md")
-    run_parser.add_argument("--profile", default=".angelcopilot/profile.md")
-    run_parser.add_argument("--out", default="outputs")
-    run_parser.add_argument("--run-id", default="")
-    run_parser.add_argument("--pdf", action="store_true", default=True)
+    run_parser = batch_subparsers.add_parser(
+        "run",
+        help="Run weekly batch assessments",
+        description="Discover recent deals, prepare documents, run assessments, and write outputs.",
+    )
+    run_parser.add_argument(
+        "--deals-root",
+        required=True,
+        help=(
+            "Root folder containing deals. "
+            "Use parent-of-syndicates with --layout syndicates, or one-syndicate/deals folder with --layout flat."
+        ),
+    )
+    run_parser.add_argument("--since-days", type=int, default=7, help="Only include deals updated in last N days.")
+    run_parser.add_argument(
+        "--assistant",
+        choices=["codex", "claude"],
+        default="codex",
+        help="Assistant backend used for assessments (and smart intake classification).",
+    )
+    run_parser.add_argument(
+        "--layout",
+        choices=["syndicates", "flat"],
+        default="syndicates",
+        help=(
+            "Folder interpretation mode: syndicates=top-level folders are containers, "
+            "flat=top-level folders/files are deals."
+        ),
+    )
+    run_parser.add_argument(
+        "--skill-path",
+        default="~/.codex/skills/angel-copilot/SKILL.md",
+        help="Path to AngelCopilot SKILL.md used by native skill invocation.",
+    )
+    run_parser.add_argument(
+        "--profile",
+        default=".angelcopilot/profile.md",
+        help="Path to local investor profile markdown file.",
+    )
+    run_parser.add_argument("--out", default="outputs", help="Directory where run outputs will be written.")
+    run_parser.add_argument("--run-id", default="", help="Optional custom run folder name.")
+    run_parser.add_argument(
+        "--parallelism",
+        type=int,
+        default=1,
+        help="Number of deal assessments to run concurrently (start with 2-3).",
+    )
+    run_parser.add_argument(
+        "--intake-filter",
+        choices=["smart", "rules"],
+        default="smart",
+        help="Deal-folder filtering mode: smart=assistant classifier + fallback rules, rules=heuristics only.",
+    )
+    run_parser.add_argument(
+        "--pdf",
+        action="store_true",
+        default=True,
+        help="Generate PDF output (requires Playwright Chromium installed).",
+    )
 
-    validate_parser = batch_subparsers.add_parser("validate", help="Validate intake folders")
-    validate_parser.add_argument("--deals-root", required=True)
-    validate_parser.add_argument("--since-days", type=int, default=7)
-    validate_parser.add_argument("--layout", choices=["syndicates", "flat"], default="syndicates")
+    validate_parser = batch_subparsers.add_parser(
+        "validate",
+        help="Validate intake folders",
+        description="Preview which deals would be discovered before running assessments.",
+    )
+    validate_parser.add_argument(
+        "--deals-root",
+        required=True,
+        help=(
+            "Root folder containing deals. "
+            "Use parent-of-syndicates with --layout syndicates, or one-syndicate/deals folder with --layout flat."
+        ),
+    )
+    validate_parser.add_argument("--since-days", type=int, default=7, help="Only include deals updated in last N days.")
+    validate_parser.add_argument(
+        "--layout",
+        choices=["syndicates", "flat"],
+        default="syndicates",
+        help=(
+            "Folder interpretation mode: syndicates=top-level folders are containers, "
+            "flat=top-level folders/files are deals."
+        ),
+    )
+    validate_parser.add_argument(
+        "--intake-filter",
+        choices=["smart", "rules"],
+        default="smart",
+        help="Deal-folder filtering mode: smart=assistant classifier + fallback rules, rules=heuristics only.",
+    )
 
-    report_parser = batch_subparsers.add_parser("report", help="Rebuild reports from JSON")
-    report_parser.add_argument("--run-id", required=True)
-    report_parser.add_argument("--target-run-id", default="")
-    report_parser.add_argument("--out", default="outputs")
-    report_parser.add_argument("--formats", default="md,csv,json,pdf")
-    report_parser.add_argument("--recompute-scoring", action="store_true")
-    report_parser.add_argument("--profile", default=".angelcopilot/profile.md")
+    report_parser = batch_subparsers.add_parser(
+        "report",
+        help="Rebuild reports from JSON",
+        description="Regenerate report artifacts from an existing run's JSON without rerunning assessments.",
+    )
+    report_parser.add_argument("--run-id", required=True, help="Source run id to load existing JSON from.")
+    report_parser.add_argument("--target-run-id", default="", help="Optional new run id for regenerated artifacts.")
+    report_parser.add_argument("--out", default="outputs", help="Base output directory where runs are stored.")
+    report_parser.add_argument("--formats", default="md,csv,json,pdf", help="Comma-separated output formats.")
+    report_parser.add_argument(
+        "--recompute-scoring",
+        action="store_true",
+        help="Reapply scoring using current profile settings before writing reports.",
+    )
+    report_parser.add_argument(
+        "--profile",
+        default=".angelcopilot/profile.md",
+        help="Profile used when --recompute-scoring is enabled.",
+    )
 
     return parser
 

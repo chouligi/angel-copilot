@@ -6,8 +6,12 @@ from pathlib import Path
 import pytest
 
 from angelcopilot_batch.assistant import (
+    ClaudeIntakeClassifier,
+    CodexIntakeClassifier,
     CodexRunner,
     build_assistant_runner,
+    build_intake_classifier,
+    build_intake_classification_prompt,
     parse_assessment_json,
     validate_assessment_payload,
 )
@@ -133,3 +137,74 @@ def test_build_assistant_runner__raises_when_binary_missing(monkeypatch: pytest.
     monkeypatch.setattr("shutil.which", lambda command: None)
     with pytest.raises(RuntimeError, match="Required CLI 'codex' was not found in PATH"):
         build_assistant_runner("codex")
+
+
+def test_codex_intake_classifier__builds_expected_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    observed: dict[str, object] = {}
+
+    def fake_run(*args: object, **kwargs: object) -> object:
+        observed["cmd"] = args[0]
+        observed["input"] = kwargs.get("input")
+
+        class Result:
+            stdout = '{"is_deal_folder": true, "confidence": 0.9, "reason": "Looks like a company name."}'
+            returncode = 0
+
+        return Result()
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    classifier = CodexIntakeClassifier(cwd=tmp_path)
+
+    decision = classifier.is_deal_folder("Beyond Reach Labs", parent_name="My Syndicate")
+
+    assert decision is True
+    cmd = observed["cmd"]
+    assert isinstance(cmd, list)
+    assert cmd[0] == "codex"
+    assert cmd[1] == "--search"
+    assert cmd[2] == "exec"
+    assert cmd[-1] == "-"
+    assert "Folder name: Beyond Reach Labs" in str(observed["input"])
+    assert "Parent folder: My Syndicate" in str(observed["input"])
+
+
+def test_claude_intake_classifier__builds_expected_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    observed: dict[str, object] = {}
+
+    def fake_run(*args: object, **kwargs: object) -> object:
+        observed["cmd"] = args[0]
+        observed["input"] = kwargs.get("input")
+        observed["cwd"] = kwargs.get("cwd")
+
+        class Result:
+            stdout = '{"is_deal_folder": false, "confidence": 0.95, "reason": "Administrative folder."}'
+            returncode = 0
+
+        return Result()
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    classifier = ClaudeIntakeClassifier(cwd=tmp_path)
+
+    decision = classifier.is_deal_folder("Closing documents", parent_name="Syndicate A")
+
+    assert decision is False
+    cmd = observed["cmd"]
+    assert isinstance(cmd, list)
+    assert cmd == ["claude", "-p"]
+    assert "Folder name: Closing documents" in str(observed["input"])
+    assert observed["cwd"] == str(tmp_path)
+
+
+def test_build_intake_classifier__returns_claude_classifier_when_available(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr("shutil.which", lambda command: "/usr/bin/mock")
+    classifier = build_intake_classifier("claude", cwd=tmp_path)
+    assert isinstance(classifier, ClaudeIntakeClassifier)
+
+
+def test_build_intake_classification_prompt__contains_required_json_contract() -> None:
+    prompt = build_intake_classification_prompt("Closing documents", "Syndicate A")
+    assert "strict JSON only" in prompt
+    assert '"is_deal_folder": true|false' in prompt
