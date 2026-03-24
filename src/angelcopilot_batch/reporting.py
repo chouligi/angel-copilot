@@ -121,6 +121,10 @@ def load_assessments_from_json(json_path: Path) -> list[AssessmentResult]:
                 what_would_upgrade_to_invest=[
                     str(item) for item in list(row.get("what_would_upgrade_to_invest", []))
                 ],
+                market_context=str(row.get("market_context", "")),
+                reconciliation_gaps=[str(item) for item in list(row.get("reconciliation_gaps", []))],
+                fit_call=str(row.get("fit_call", "")),
+                founder_questions=[str(item) for item in list(row.get("founder_questions", []))],
                 weighted_score=float(row.get("weighted_score", 0.0)),
                 verdict=str(row.get("verdict", "")),
                 attention_flag=bool(row.get("attention_flag", False)),
@@ -257,6 +261,26 @@ def _render_markdown(
                 lines.append(f"- {unknown}")
         else:
             lines.append("- No key unknowns provided.")
+
+        lines.extend(["", "#### Market Context", ""])
+        lines.append(assessment.market_context or "No market context provided.")
+
+        lines.extend(["", "#### Reconciliation Gaps", ""])
+        if assessment.reconciliation_gaps:
+            for gap in assessment.reconciliation_gaps:
+                lines.append(f"- {gap}")
+        else:
+            lines.append("- No reconciliation gaps provided.")
+
+        lines.extend(["", "#### Profile Fit Call", ""])
+        lines.append(assessment.fit_call or "No profile fit call provided.")
+
+        lines.extend(["", "#### Founder Questions", ""])
+        if assessment.founder_questions:
+            for question in assessment.founder_questions:
+                lines.append(f"- {question}")
+        else:
+            lines.append("- No founder questions provided.")
 
         lines.extend(["", "#### Return Scenarios", ""])
         check_size = _format_currency(assessment.hypothetical_investment, assessment.investment_currency)
@@ -568,6 +592,12 @@ def _render_appendix_section_html(index: int, assessment: AssessmentResult) -> s
     unknowns_items = "".join(
         f"<li>{escape(unknown)}</li>" for unknown in assessment.key_unknowns
     ) or "<li>No key unknowns provided.</li>"
+    reconciliation_gaps_items = "".join(
+        f"<li>{escape(gap)}</li>" for gap in assessment.reconciliation_gaps
+    ) or "<li>No reconciliation gaps provided.</li>"
+    founder_questions_items = "".join(
+        f"<li>{escape(question)}</li>" for question in assessment.founder_questions
+    ) or "<li>No founder questions provided.</li>"
 
     attention = "YES" if assessment.attention_flag else "NO"
 
@@ -616,6 +646,14 @@ def _render_appendix_section_html(index: int, assessment: AssessmentResult) -> s
         f"<ul>{milestones_items}</ul>"
         "<h3>Key Unknowns</h3>"
         f"<ul>{unknowns_items}</ul>"
+        "<h3>Market Context</h3>"
+        f"<div class='rationale'>{escape(assessment.market_context or 'No market context provided.')}</div>"
+        "<h3>Reconciliation Gaps</h3>"
+        f"<ul>{reconciliation_gaps_items}</ul>"
+        "<h3>Profile Fit Call</h3>"
+        f"<div class='rationale'>{escape(assessment.fit_call or 'No profile fit call provided.')}</div>"
+        "<h3>Founder Questions</h3>"
+        f"<ul>{founder_questions_items}</ul>"
         "<h3>Return Scenarios</h3>"
         f"<p class='context-note'><strong>Hypothetical check size:</strong> {escape(check_size)} "
         f"({'profile-based' if assessment.investment_basis == 'profile_ticket_typical' else 'default'}).</p>"

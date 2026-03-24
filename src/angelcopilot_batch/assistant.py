@@ -204,6 +204,10 @@ def validate_assessment_payload(payload: dict[str, object]) -> dict[str, object]
         "what_would_upgrade_to_invest": [
             str(item) for item in _as_list(payload.get("what_would_upgrade_to_invest", []))
         ],
+        "market_context": str(payload.get("market_context", "")),
+        "reconciliation_gaps": [str(item) for item in _as_list(payload.get("reconciliation_gaps", []))],
+        "fit_call": str(payload.get("fit_call", "")),
+        "founder_questions": [str(item) for item in _as_list(payload.get("founder_questions", []))],
     }
 
 

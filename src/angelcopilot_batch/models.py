@@ -62,6 +62,10 @@ class AssessmentResult:
     verdict_one_liner: str = ""
     why_not_invest_now: list[str] = field(default_factory=list)
     what_would_upgrade_to_invest: list[str] = field(default_factory=list)
+    market_context: str = ""
+    reconciliation_gaps: list[str] = field(default_factory=list)
+    fit_call: str = ""
+    founder_questions: list[str] = field(default_factory=list)
     weighted_score: float = 0.0
     verdict: str = ""
     attention_flag: bool = False

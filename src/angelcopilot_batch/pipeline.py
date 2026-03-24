@@ -340,6 +340,10 @@ def _build_scored_assessment(
         what_would_upgrade_to_invest=[
             str(item) for item in list(normalized_payload.get("what_would_upgrade_to_invest", []))
         ],
+        market_context=str(normalized_payload.get("market_context", "")),
+        reconciliation_gaps=[str(item) for item in list(normalized_payload.get("reconciliation_gaps", []))],
+        fit_call=str(normalized_payload.get("fit_call", "")),
+        founder_questions=[str(item) for item in list(normalized_payload.get("founder_questions", []))],
         evidence_sources=list(evidence_sources),
         extraction_warnings=list(extraction_warnings),
         hypothetical_investment=check_size,
@@ -364,6 +368,8 @@ def build_skill_native_prompt(
         "Run the skill workflow as a standalone single-deal assessment.\n"
         "Do not re-implement or summarize the skill rules in a custom rubric.\n"
         "Read files directly from the deal folder path provided.\n"
+        "Depth requirement: include substantive analysis in each category rationale, include a concise market context "
+        "synthesis, explicit reconciliation gaps, a profile fit call, and at least three founder questions.\n"
         "After completing the assessment, output strict JSON only.\n"
         f"Required JSON schema: {response_schema}\n"
         f"If the assessed company name differs from folder name, keep deal_id as '{deal_id}'.\n"
@@ -388,6 +394,10 @@ def _response_schema_template() -> str:
         '"verdict_one_liner":"...",'
         '"why_not_invest_now":["..."],'
         '"what_would_upgrade_to_invest":["..."],'
+        '"market_context":"...",'
+        '"reconciliation_gaps":["..."],'
+        '"fit_call":"...",'
+        '"founder_questions":["..."],'
         '"assessment_process":{"single_deal_equivalent":"yes|partial|no","used_full_rubric":true,'
         '"performed_web_sweep":true,"reconciled_docs_with_web":true,'
         '"built_three_case_return_model":true,"notes":"..."}}'
