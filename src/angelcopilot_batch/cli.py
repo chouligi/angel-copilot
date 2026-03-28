@@ -193,9 +193,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     run_parser.add_argument(
         "--pdf",
+        dest="pdf",
         action="store_true",
         default=True,
-        help="Generate PDF output (requires Playwright Chromium installed).",
+        help="Generate PDF output (default: enabled; requires Playwright Chromium installed).",
+    )
+    run_parser.add_argument(
+        "--no-pdf",
+        dest="pdf",
+        action="store_false",
+        help="Disable PDF output.",
     )
 
     validate_parser = batch_subparsers.add_parser(

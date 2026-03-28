@@ -109,7 +109,7 @@ def _build_progress_callback(logger: LogFn) -> Callable[[str, dict[str, object]]
         if event == "deal_started":
             logger(
                 f"{prefix} [{payload.get('index')}/{payload.get('total')}] "
-                f"starting deal '{payload.get('deal_id')}' (files={payload.get('supported_files')})"
+                f"preparing deal '{payload.get('deal_id')}' (files={payload.get('supported_files')})"
             )
             return
         if event == "deal_prepared":
@@ -117,6 +117,12 @@ def _build_progress_callback(logger: LogFn) -> Callable[[str, dict[str, object]]
                 f"{prefix} [{payload.get('index')}/{payload.get('total')}] "
                 f"prepared deal '{payload.get('deal_id')}' "
                 f"(files_used={payload.get('files_used')}, warnings={payload.get('warnings')})"
+            )
+            return
+        if event == "deal_assessment_started":
+            logger(
+                f"{prefix} [{payload.get('index')}/{payload.get('total')}] "
+                f"assessment started for '{payload.get('deal_id')}'"
             )
             return
         if event == "deal_completed":

@@ -94,10 +94,17 @@ If `angelcopilot` is not found in your shell, run:
 python3 -m angelcopilot_batch.cli setup
 ```
 
-Or run directly from the repo without installing the CLI entrypoint:
+If you are running directly from the repo and still see `ModuleNotFoundError`, use:
 
 ```bash
 PYTHONPATH=src python3 -m angelcopilot_batch.cli setup
+```
+
+The same pattern applies to other commands:
+
+```bash
+python3 -m angelcopilot_batch.cli batch validate ...
+python3 -m angelcopilot_batch.cli batch run ...
 ```
 
 ### Optional local profile

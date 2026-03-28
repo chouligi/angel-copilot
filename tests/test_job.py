@@ -82,5 +82,6 @@ def test_run_batch_job__logs_progress_and_writes_outputs(tmp_path: Path) -> None
 
     assert len(result.assessments) == 1
     assert result.output_paths.markdown_path.exists()
-    assert any("starting deal" in msg for msg in messages)
+    assert any("preparing deal" in msg for msg in messages)
+    assert any("assessment started for 'deal_a'" in msg for msg in messages)
     assert any("done 'deal_a'" in msg for msg in messages)

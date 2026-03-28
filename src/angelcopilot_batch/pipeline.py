@@ -234,6 +234,15 @@ def _assess_prepared_deal(
     deal = prepared_task.deal
     prepared_workspace = prepared_task.workspace
     try:
+        _emit_progress(
+            progress_callback,
+            "deal_assessment_started",
+            {
+                "deal_id": deal.deal_id,
+                "index": prepared_task.index,
+                "total": prepared_task.total,
+            },
+        )
         payload, error_message = _run_with_retry(runner=runner, prompt=prepared_task.prompt, cwd=cwd)
         if payload is None:
             _emit_progress(
