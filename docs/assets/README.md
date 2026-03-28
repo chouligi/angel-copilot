@@ -4,12 +4,12 @@ This folder stores launch visuals used by the root README and release pages.
 
 ## Recommended files
 
-- `quick-deal-memo.png`
+- `single_deal_md_example.png`
   - Screenshot of a single-deal memo response.
-- `dealflow-triage-report.png`
-  - Screenshot of comparative batch report (summary/table view).
-- `dealflow-triage-demo.gif` (optional)
-  - Short demo clip of batch run + report output.
+- `batch_report_example_1.png`
+  - Screenshot of comparative batch report overview (ranked summary).
+- `batch_report_example_2.png`
+  - Screenshot of individual-deal section in the batch report.
 
 ## Guidelines
 
@@ -20,4 +20,4 @@ This folder stores launch visuals used by the root README and release pages.
 
 ## Status
 
-These assets are placeholders for `v0.1.0`. Add real screenshots before public launch.
+Assets currently use synthetic sample outputs from this repository.

@@ -56,14 +56,20 @@ Best for screening multiple startups and deciding where to focus.
 - Helps rank which deals deserve follow-up attention first.
 - Produces a polished comparative PDF report as the batch artifact.
 
-## Screenshot / demo placeholders
+## Screenshots
 
-Add launch visuals in [`docs/assets`](docs/assets):
+All screenshots below use synthetic sample content from this repo.
 
-- `quick-deal-memo.png`: single-deal memo screenshot.
-- `dealflow-triage-report.png`: comparative report screenshot.
+### Quick Deal Memo preview
 
-See [`docs/assets/README.md`](docs/assets/README.md) for expected dimensions and naming.
+![Quick Deal Memo screenshot](docs/assets/single_deal_md_example.png)
+
+### Dealflow Triage preview
+
+![Dealflow Triage overview screenshot](docs/assets/batch_report_example_1.png)
+![Dealflow Triage individual deals screenshot](docs/assets/batch_report_example_2.png)
+
+See [`docs/assets/README.md`](docs/assets/README.md) for asset details.
 
 ## Try it on a sample deal in 5 minutes
 
@@ -318,6 +324,7 @@ What to expect:
 
 Example location:
 - [`examples/sample-output/quick-deal-memo/sample_quick_deal_memo.md`](examples/sample-output/quick-deal-memo/sample_quick_deal_memo.md)
+- Screenshot: [`docs/assets/single_deal_md_example.png`](docs/assets/single_deal_md_example.png)
 
 ### Sample Dealflow Triage Report
 
@@ -332,6 +339,9 @@ Example location:
   [`examples/sample-output/dealflow-triage/fictional_batch_assessments.json`](examples/sample-output/dealflow-triage/fictional_batch_assessments.json)
 - Synthetic report artifact:
   [`examples/sample-output/dealflow-triage/angelcopilot_batch_report.pdf`](examples/sample-output/dealflow-triage/angelcopilot_batch_report.pdf)
+- Screenshots:
+  [`docs/assets/batch_report_example_1.png`](docs/assets/batch_report_example_1.png),
+  [`docs/assets/batch_report_example_2.png`](docs/assets/batch_report_example_2.png)
 
 
 ## Contributing
