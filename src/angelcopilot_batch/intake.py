@@ -43,7 +43,7 @@ FolderClassifier = Callable[[str, str | None], bool] | object
 
 def discover_recent_deals(
     deals_root: Path,
-    since_days: int = 7,
+    since_days: int | None = 7,
     now: datetime | None = None,
     top_level_containers: bool = False,
     intake_filter: str = INTAKE_FILTER_SMART,
@@ -53,7 +53,7 @@ def discover_recent_deals(
 
     Args:
         deals_root: Root directory containing deal folders/files.
-        since_days: Include candidates modified within the last N days.
+        since_days: Include candidates modified within the last N days. ``None`` includes all.
         now: Optional current timestamp override (UTC-aware).
         top_level_containers: Whether top-level folders are grouping buckets (``syndicates`` layout mode).
         intake_filter: Intake filtering mode (``smart`` or ``rules``).
@@ -69,7 +69,7 @@ def discover_recent_deals(
         raise ValueError(f"Unsupported intake_filter: {intake_filter}")
 
     now_utc = now or datetime.now(timezone.utc)
-    cutoff = now_utc - timedelta(days=since_days)
+    cutoff = now_utc - timedelta(days=since_days) if since_days is not None else None
     discovered: list[DealInput] = []
     classifier_cache: dict[tuple[str, str | None], bool] = {}
 
@@ -88,7 +88,7 @@ def discover_recent_deals(
             continue
 
         latest_modified_at = _latest_modified_timestamp(candidate, supported_files)
-        if latest_modified_at < cutoff:
+        if cutoff is not None and latest_modified_at < cutoff:
             continue
 
         deal_id = candidate.stem if candidate.is_file() else candidate.name

@@ -1,6 +1,6 @@
 ![Angel Copilot Logo](../../logo_Dec_25_bigger.png)
 
-# AngelCopilot Batch Report
+# AngelCopilot Dealflow Triage Report
 
 > All company names, product names, data, and sources in this report are intentionally synthetic sample content created for demonstration purposes.
 

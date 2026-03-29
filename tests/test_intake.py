@@ -58,6 +58,20 @@ def test_discover_recent_deals__returns_only_recent_deals(tmp_path: Path) -> Non
     assert recent_file in deals[0].supported_files
 
 
+def test_discover_recent_deals__includes_all_deals_when_since_days_omitted(tmp_path: Path) -> None:
+    deals_root = tmp_path / "deals"
+    deal_a = deals_root / "deal_alpha"
+    deal_b = deals_root / "deal_beta"
+    deal_a.mkdir(parents=True)
+    deal_b.mkdir(parents=True)
+    (deal_a / "memo.txt").write_text("alpha", encoding="utf-8")
+    (deal_b / "memo.txt").write_text("beta", encoding="utf-8")
+
+    deals = discover_recent_deals(deals_root=deals_root, since_days=None)
+
+    assert {deal.deal_id for deal in deals} == {"deal_alpha", "deal_beta"}
+
+
 def test_discover_recent_deals__ignores_deals_without_supported_files(tmp_path: Path) -> None:
     deals_root = tmp_path / "deals"
     deal_folder = deals_root / "deal_without_docs"

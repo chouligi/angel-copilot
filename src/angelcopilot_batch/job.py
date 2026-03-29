@@ -32,7 +32,7 @@ class BatchRunResult:
 
 def run_batch_job(
     deals_root: str | Path,
-    since_days: int = 7,
+    since_days: int | None = None,
     assistant: str = "codex",
     profile_path: str | Path = ".angelcopilot/profile.md",
     out: str | Path = "outputs",
@@ -50,7 +50,7 @@ def run_batch_job(
 
     Args:
         deals_root: Root path containing deal folders/files.
-        since_days: Intake lookback window in days.
+        since_days: Intake lookback window in days; ``None`` includes all deals.
         assistant: Assistant backend name (``codex`` or ``claude``).
         profile_path: Path to investor profile markdown file.
         out: Output directory for run artifacts.
@@ -145,9 +145,11 @@ def _build_progress_callback(logger: LogFn) -> Callable[[str, dict[str, object]]
         """
         prefix = f"[{_timestamp()}]"
         if event == "batch_started":
+            since_days = payload.get("since_days")
+            since_label = since_days if since_days is not None else "all"
             logger(
                 f"{prefix} batch started: deals={payload.get('total_deals', 0)} "
-                f"since_days={payload.get('since_days')} mode={payload.get('execution_mode')}"
+                f"since_days={since_label} mode={payload.get('execution_mode')}"
             )
             return
         if event == "deal_started":

@@ -187,7 +187,7 @@ def _render_markdown(
 
     lines.extend(
         [
-            "# AngelCopilot Batch Report",
+            "# AngelCopilot Dealflow Triage Report",
             "",
             report_metadata,
             "",
@@ -535,7 +535,7 @@ def _render_html(assessments: list[AssessmentResult], run_id: str) -> str:
         "<section class='page cover'>"
         "<div class='cover-header'>"
         "<div>"
-        "<h1>AngelCopilot Batch Report</h1>"
+        "<h1>AngelCopilot Dealflow Triage Report</h1>"
         f"<p class='subtitle'>{escape(report_metadata)}</p>"
         "</div>"
         f"{_render_logo_wrap_html(logo_html)}"

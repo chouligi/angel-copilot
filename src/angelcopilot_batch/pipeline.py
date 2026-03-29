@@ -36,7 +36,7 @@ class PreparedDealTask:
 
 def run_batch_assessment(
     deals_root: Path,
-    since_days: int,
+    since_days: int | None,
     profile: InvestorProfile,
     runner,
     cwd: Path,
@@ -53,7 +53,7 @@ def run_batch_assessment(
 
     Args:
         deals_root: Root directory with discovered deal folders/files.
-        since_days: Intake lookback window in days.
+        since_days: Intake lookback window in days; ``None`` includes all deals.
         profile: Investor profile used for fit and scoring.
         runner: Assistant runner implementing ``run_assessment``.
         cwd: Working directory for assistant commands.

@@ -66,7 +66,7 @@ def test_write_batch_outputs__writes_md_csv_json(tmp_path: Path) -> None:
     assert markdown_text.index("#### Final Verdict") < markdown_text.index("#### Assessment Evidence Appendix")
     assert "Why not INVEST now:" in markdown_text
     assert "What would upgrade to INVEST:" in markdown_text
-    assert "AngelCopilot Batch Report" in html_text
+    assert "AngelCopilot Dealflow Triage Report" in html_text
     assert "Individual Assessments" in html_text
     assert "Input Documents Processed (Local Files)" in html_text
     assert "Evidence Preparation Warnings" in html_text

@@ -399,8 +399,8 @@ def _add_common_discovery_arguments(parser: argparse.ArgumentParser) -> None:
     discovery_group.add_argument(
         "--since-days",
         type=int,
-        default=7,
-        help="Only include deals updated in the last N days.",
+        default=None,
+        help="Only include deals updated in the last N days. Omit to include all detected deals.",
     )
     discovery_group.add_argument(
         "--layout",

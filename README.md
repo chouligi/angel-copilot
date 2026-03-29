@@ -2,13 +2,13 @@
 
 # Angel Copilot
 
-Angel Copilot is an open-source AI workflow for angel investors. It helps you evaluate a single startup quickly or screen multiple deals at once and generate a ranked dealflow report.
+Angel Copilot is an open-source AI tool for angel investors. It helps you evaluate a single startup quickly or screen multiple deals at once and generate a ranked dealflow report.
 
-It supports two core workflows: Quick Deal Memo and Dealflow Triage. Both can run with or without an investor profile, but we recommend creating your investor profile first for best results. Outputs are designed for decision support, with structured Markdown memos for single deals and comparative PDF reports for multi-deal prioritization.
+It supports two modes: Deal Assessment Memo and Dealflow Triage. Both can run with or without an investor profile, but we recommend creating your investor profile first for best results. Outputs are designed for decision support, with structured Markdown memos for single deals and comparative PDF reports for multi-deal prioritization.
 
 ## Why Angel Copilot
 
-Assessing startup deals is hard. Even experienced angels benefit from a structured thinking partner that can challenge assumptions, surface risks, and help turn messy materials into a clearer investment view.
+Assessing startup deals is hard. Even experienced angel investors benefit from a structured thinking partner that can challenge assumptions, surface risks, and help turn messy materials into a clearer investment view.
 
 And when dealflow gets large, reviewing every company deeply can become a full-time job. Angel Copilot helps you move from ad-hoc assessment to focused triage, so you can spend more time on the deals most worth your attention.
 
@@ -16,7 +16,7 @@ And when dealflow gets large, reviewing every company deeply can become a full-t
 
 Pick the path that matches your goal:
 
-- Quick Deal Memo (fastest): upload/import `angel-copilot.skill`, then run the single-deal prompt in "Try it on a sample deal in 5 minutes."
+- Deal Assessment Memo (fastest): upload/import `angel-copilot.skill`, then run the single-deal prompt in "Try it on a sample deal in 5 minutes."
 - Dealflow Triage (advanced): complete "Dealflow Triage dependencies (local CLI)" in Installation, then run `batch validate` and `batch run` on your deal folders.
 - Recommended first step for either path: create your investor profile in "Recommended first step: create your investor profile."
 
@@ -37,7 +37,7 @@ Pick the path that matches your goal:
 
 ## How to use Angel Copilot
 
-### 1) Quick Deal Memo
+### 1) Deal Assessment Memo
 
 Best for evaluating one startup quickly.
 
@@ -60,9 +60,9 @@ Best for screening multiple startups and deciding where to focus.
 
 All screenshots below use synthetic sample content from this repo.
 
-### Quick Deal Memo preview
+### Deal Assessment Memo preview
 
-![Quick Deal Memo screenshot](docs/assets/single_deal_md_example.png)
+![Deal Assessment Memo screenshot](docs/assets/single_deal_md_example.png)
 
 ### Dealflow Triage preview
 
@@ -75,7 +75,7 @@ See [`docs/assets/README.md`](docs/assets/README.md) for asset details.
 
 Use the synthetic sample and fixture data in this repository. No real company data is required.
 
-### A) Quick single-deal memo (skill flow)
+### A) Single-deal assessment memo (skill flow)
 
 1. Load Angel Copilot as a local skill in Codex or Claude Code.
 2. After installing the local skill, ask Angel Copilot to assess the synthetic sample deal folder.
@@ -98,6 +98,7 @@ Profile behavior in skill flow:
 Expected output:
 - A structured deal assessment memo in the chat response.
 - You can save a copy at `examples/sample-output/quick-deal-memo/` (see placeholder there).
+- The memo header is `Deal Assessment Memo`.
 
 ### B) Dealflow triage (batch flow)
 
@@ -110,7 +111,7 @@ How Dealflow Triage discovers deals:
   - `flat`: top-level folders/files are treated as deals directly.
 3. It scans for supported documents (`.txt`, `.md`, `.pdf`, `.docx`, `.zip`).
 4. It computes each deal's latest activity timestamp from supported files/folders.
-5. It keeps only deals active in the last `--since-days` days.
+5. If you pass `--since-days`, it keeps only deals active in that lookback window; if omitted, it includes all detected deals.
 6. `batch validate` shows which deals were detected; `batch run` scores those detected deals.
 
 Directory examples for `--deals-root`:
@@ -142,7 +143,6 @@ Use synthetic fixtures first (demo):
 uv run python -m angelcopilot_batch.cli batch validate \
   --deals-root tests/fixtures/deals \
   --layout flat \
-  --since-days 3650 \
   --intake-filter rules
 ```
 
@@ -152,7 +152,6 @@ Then run a small comparative batch:
 uv run python -m angelcopilot_batch.cli batch run \
   --deals-root tests/fixtures/deals \
   --layout flat \
-  --since-days 3650 \
   --assistant codex \
   --skill-path <path-to-installed-skill-md> \
   --profile .angelcopilot/profile.md \
@@ -172,6 +171,7 @@ If `.angelcopilot/profile.md` does not exist yet, create it first (see "Recommen
 Expected output folder:
 - `outputs/run_<timestamp>/`
 - Includes `angelcopilot_batch_report.md`, `angelcopilot_batch_summary.csv`, `angelcopilot_batch_assessments.json`, `angelcopilot_batch_report.html`
+- The Markdown/HTML/PDF report header is `AngelCopilot Dealflow Triage Report`.
 - PDF generation is enabled by default; use `--no-pdf` to disable.
 
 If PDF is missing, run setup once:
@@ -181,6 +181,8 @@ uv run python -m angelcopilot_batch.cli setup
 ```
 
 Run Dealflow Triage on your own deal folders:
+
+Tip: omit `--since-days` to include all deals in `--deals-root`.
 
 Layout quick guide:
 - `--layout syndicates`: top-level folders are group/source folders that contain deal folders (for example, `/deals-root/SourceA/startup-a/`).
@@ -240,7 +242,7 @@ cp examples/profile.local.template.md .angelcopilot/profile.md
 
 Choose the path that matches how you want to use Angel Copilot:
 
-- Quick Deal Memo via skill upload/import: no local Python setup required.
+- Deal Assessment Memo via skill upload/import: no local Python setup required.
 - Dealflow Triage via local CLI: install local dependencies and one assistant CLI (`codex` or `claude`).
 
 ### Packaged `.skill`
@@ -357,7 +359,7 @@ PYTHONPATH=src python3 -m angelcopilot_batch.cli --help
 
 ## Sample output
 
-### Sample Quick Deal Memo
+### Sample Deal Assessment Memo
 
 What to expect:
 - Narrative-first single-company memo.
