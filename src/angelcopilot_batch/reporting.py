@@ -1,3 +1,5 @@
+"""Render and persist batch assessment artifacts (md/csv/json/html/pdf)."""
+
 from __future__ import annotations
 
 import ast
@@ -36,6 +38,18 @@ def write_batch_outputs(
     run_id: str,
     include_pdf: bool = False,
 ) -> BatchOutputPaths:
+    """Write all report artifacts for a run and optionally render PDF.
+
+    Args:
+        assessments: Scored deal assessments for the run.
+        output_dir: Base output directory containing run folders.
+        run_id: Target run folder name.
+        include_pdf: Whether to render PDF artifact via Playwright.
+
+    Returns:
+        Paths of generated artifacts.
+    """
+
     run_dir = output_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -75,6 +89,15 @@ def write_batch_outputs(
 
 
 def load_assessments_from_json(json_path: Path) -> list[AssessmentResult]:
+    """Load normalized ``AssessmentResult`` rows from a saved JSON artifact.
+
+    Args:
+        json_path: Path to saved assessments JSON.
+
+    Returns:
+        Parsed assessment rows suitable for report regeneration.
+    """
+
     payload = json.loads(json_path.read_text(encoding="utf-8"))
     rows = payload.get("assessments", []) if isinstance(payload, dict) else []
     assessments: list[AssessmentResult] = []
@@ -140,6 +163,17 @@ def _render_markdown(
     run_id: str,
     logo_markdown_path: str | None,
 ) -> str:
+    """Render the full batch report in markdown format.
+    
+    Args:
+        assessments: Value for ``assessments``.
+        run_id: Value for ``run_id``.
+        logo_markdown_path: Value for ``logo_markdown_path``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
+
     attention_deals = [assessment for assessment in assessments if assessment.attention_flag]
     report_metadata = _build_report_metadata_line(
         run_id=run_id,
@@ -361,6 +395,16 @@ def _render_markdown(
 
 
 def _write_csv(csv_path: Path, assessments: list[AssessmentResult]) -> None:
+    """Write compact per-deal summary rows to CSV.
+    
+    Args:
+        csv_path: Value for ``csv_path``.
+        assessments: Value for ``assessments``.
+    
+    Returns:
+        None.
+    """
+
     fieldnames = [
         "deal_id",
         "company_name",
@@ -393,6 +437,16 @@ def _write_csv(csv_path: Path, assessments: list[AssessmentResult]) -> None:
 
 
 def _write_json(json_path: Path, assessments: list[AssessmentResult]) -> None:
+    """Persist normalized assessment payloads to JSON.
+    
+    Args:
+        json_path: Value for ``json_path``.
+        assessments: Value for ``assessments``.
+    
+    Returns:
+        None.
+    """
+
     payload = {
         "summary": {
             "total": len(assessments),
@@ -404,6 +458,16 @@ def _write_json(json_path: Path, assessments: list[AssessmentResult]) -> None:
 
 
 def _render_html(assessments: list[AssessmentResult], run_id: str) -> str:
+    """Render an HTML report suitable for browser view and PDF conversion.
+    
+    Args:
+        assessments: Value for ``assessments``.
+        run_id: Value for ``run_id``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
+
     attention_deals = [assessment for assessment in assessments if assessment.attention_flag]
     report_metadata = _build_report_metadata_line(
         run_id=run_id,
@@ -501,10 +565,28 @@ def _render_html(assessments: list[AssessmentResult], run_id: str) -> str:
 
 
 def _copyright_year() -> int:
+    """Copyright year.
+    
+    Args:
+        None.
+    
+    Returns:
+        int: Value returned by this function.
+    """
     return datetime.now().year
 
 
 def _build_report_metadata_line(run_id: str, total_assessments: int, attention_count: int) -> str:
+    """Build report metadata line.
+    
+    Args:
+        run_id: Value for ``run_id``.
+        total_assessments: Value for ``total_assessments``.
+        attention_count: Value for ``attention_count``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     generated_label = _humanize_run_id_timestamp(run_id)
     return (
         f"Generated: {generated_label} | "
@@ -514,6 +596,14 @@ def _build_report_metadata_line(run_id: str, total_assessments: int, attention_c
 
 
 def _humanize_run_id_timestamp(run_id: str) -> str:
+    """Humanize run id timestamp.
+    
+    Args:
+        run_id: Value for ``run_id``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     modern_match = re.match(
         r"^run_(?P<year>\d{4})_(?P<month>[A-Za-z]+)_(?P<day>\d{1,2})_"
         r"(?P<hour>\d{2})-(?P<minute>\d{2})-(?P<second>\d{2})_(?P<tz>[A-Za-z0-9+\-]+)$",
@@ -541,6 +631,14 @@ def _humanize_run_id_timestamp(run_id: str) -> str:
 
 
 def _render_overview_row_html(assessment: AssessmentResult) -> str:
+    """Render overview row html.
+    
+    Args:
+        assessment: Value for ``assessment``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     verdict_class = _verdict_pill_class(assessment.verdict)
     attention = "YES" if assessment.attention_flag else "NO"
     row_class = "attention-row" if assessment.attention_flag else ""
@@ -557,6 +655,15 @@ def _render_overview_row_html(assessment: AssessmentResult) -> str:
 
 
 def _render_appendix_section_html(index: int, assessment: AssessmentResult) -> str:
+    """Render appendix section html.
+    
+    Args:
+        index: Value for ``index``.
+        assessment: Value for ``assessment``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     category_rows = "\n".join(
         "<tr>"
         f"<td>{escape(category)}</td>"
@@ -681,6 +788,14 @@ def _render_appendix_section_html(index: int, assessment: AssessmentResult) -> s
 
 
 def _verdict_pill_class(verdict: str) -> str:
+    """Verdict pill class.
+    
+    Args:
+        verdict: Value for ``verdict``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     normalized = verdict.strip().upper()
     if normalized == "INVEST":
         return "pill-invest"
@@ -690,6 +805,14 @@ def _verdict_pill_class(verdict: str) -> str:
 
 
 def _build_logo_markdown_path(run_dir: Path) -> str | None:
+    """Build logo markdown path.
+    
+    Args:
+        run_dir: Value for ``run_dir``.
+    
+    Returns:
+        str | None: Value returned by this function.
+    """
     logo_path = _resolve_logo_path()
     if not logo_path.exists():
         return None
@@ -697,6 +820,14 @@ def _build_logo_markdown_path(run_dir: Path) -> str | None:
 
 
 def _load_logo_data_uri() -> str | None:
+    """Load logo data uri.
+    
+    Args:
+        None.
+    
+    Returns:
+        str | None: Value returned by this function.
+    """
     logo_path = _resolve_logo_path()
     if not logo_path.exists():
         return None
@@ -707,16 +838,40 @@ def _load_logo_data_uri() -> str | None:
 
 
 def _resolve_logo_path() -> Path:
+    """Resolve logo path.
+    
+    Args:
+        None.
+    
+    Returns:
+        Path: Value returned by this function.
+    """
     return Path(__file__).resolve().parents[2] / "logo_Dec_25_bigger.png"
 
 
 def _render_logo_wrap_html(logo_html: str) -> str:
+    """Render logo wrap html.
+    
+    Args:
+        logo_html: Value for ``logo_html``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     if not logo_html:
         return ""
     return f"<div class='logo-wrap'>{logo_html}</div>"
 
 
 def _render_process_markdown(process: dict[str, object]) -> list[str]:
+    """Render process markdown.
+    
+    Args:
+        process: Value for ``process``.
+    
+    Returns:
+        list[str]: Value returned by this function.
+    """
     if not process:
         return ["- No process checklist provided."]
     rows = [
@@ -736,6 +891,14 @@ def _render_process_markdown(process: dict[str, object]) -> list[str]:
 
 
 def _render_process_html_table(process: dict[str, object]) -> str:
+    """Render process html table.
+    
+    Args:
+        process: Value for ``process``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     if not process:
         return "<div class='rationale'>No process checklist provided.</div>"
     rows = [
@@ -760,6 +923,14 @@ def _render_process_html_table(process: dict[str, object]) -> str:
 
 
 def _format_process_value(value: object) -> str:
+    """Format process value.
+    
+    Args:
+        value: Value for ``value``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     if isinstance(value, bool):
         return "YES" if value else "NO"
     if value is None:
@@ -768,6 +939,14 @@ def _format_process_value(value: object) -> str:
 
 
 def _render_final_verdict_markdown_lines(assessment: AssessmentResult) -> list[str]:
+    """Render final verdict markdown lines.
+    
+    Args:
+        assessment: Value for ``assessment``.
+    
+    Returns:
+        list[str]: Value returned by this function.
+    """
     verdict_summary = _resolve_verdict_summary(assessment)
     show_non_invest_sections = not _is_invest_verdict(assessment.verdict)
     why_not_invest_now = _resolve_why_not_invest_now(assessment) if show_non_invest_sections else []
@@ -790,6 +969,14 @@ def _render_final_verdict_markdown_lines(assessment: AssessmentResult) -> list[s
 
 
 def _render_final_verdict_html(assessment: AssessmentResult) -> str:
+    """Render final verdict html.
+    
+    Args:
+        assessment: Value for ``assessment``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     verdict_summary = _resolve_verdict_summary(assessment)
     show_non_invest_sections = not _is_invest_verdict(assessment.verdict)
     html = (
@@ -817,10 +1004,26 @@ def _render_final_verdict_html(assessment: AssessmentResult) -> str:
 
 
 def _is_invest_verdict(verdict: str) -> bool:
+    """Is invest verdict.
+    
+    Args:
+        verdict: Value for ``verdict``.
+    
+    Returns:
+        bool: Value returned by this function.
+    """
     return verdict.strip().upper() == "INVEST"
 
 
 def _final_conclusion_line(verdict: str) -> str:
+    """Final conclusion line.
+    
+    Args:
+        verdict: Value for ``verdict``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     normalized = verdict.strip().upper()
     if normalized == "INVEST":
         return "Proceed to deep diligence and allocation planning."
@@ -830,24 +1033,56 @@ def _final_conclusion_line(verdict: str) -> str:
 
 
 def _resolve_verdict_summary(assessment: AssessmentResult) -> str:
+    """Resolve verdict summary.
+    
+    Args:
+        assessment: Value for ``assessment``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     if assessment.verdict_one_liner.strip():
         return assessment.verdict_one_liner.strip()
     return _final_conclusion_line(assessment.verdict)
 
 
 def _resolve_why_not_invest_now(assessment: AssessmentResult) -> list[str]:
+    """Resolve why not invest now.
+    
+    Args:
+        assessment: Value for ``assessment``.
+    
+    Returns:
+        list[str]: Value returned by this function.
+    """
     if assessment.why_not_invest_now:
         return [item for item in assessment.why_not_invest_now if item.strip()]
     return _fallback_why_not_invest_now(assessment)
 
 
 def _resolve_upgrade_to_invest(assessment: AssessmentResult) -> list[str]:
+    """Resolve upgrade to invest.
+    
+    Args:
+        assessment: Value for ``assessment``.
+    
+    Returns:
+        list[str]: Value returned by this function.
+    """
     if assessment.what_would_upgrade_to_invest:
         return [item for item in assessment.what_would_upgrade_to_invest if item.strip()]
     return _fallback_upgrade_to_invest(assessment)
 
 
 def _fallback_why_not_invest_now(assessment: AssessmentResult) -> list[str]:
+    """Fallback why not invest now.
+    
+    Args:
+        assessment: Value for ``assessment``.
+    
+    Returns:
+        list[str]: Value returned by this function.
+    """
     if assessment.verdict.strip().upper() == "INVEST":
         return ["No blocking factors identified under current assessment."]
 
@@ -870,6 +1105,14 @@ def _fallback_why_not_invest_now(assessment: AssessmentResult) -> list[str]:
 
 
 def _fallback_upgrade_to_invest(assessment: AssessmentResult) -> list[str]:
+    """Fallback upgrade to invest.
+    
+    Args:
+        assessment: Value for ``assessment``.
+    
+    Returns:
+        list[str]: Value returned by this function.
+    """
     milestones = [item for item in assessment.milestones_to_monitor if item.strip()]
     if milestones:
         return milestones[:3]
@@ -881,6 +1124,14 @@ def _fallback_upgrade_to_invest(assessment: AssessmentResult) -> list[str]:
 
 
 def _format_web_finding_markdown(item: dict[str, object] | str) -> str:
+    """Format web finding markdown.
+    
+    Args:
+        item: Value for ``item``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     detail = _detail_dict_or_none(item)
     if detail is None:
         return _markdown_cell(str(item))
@@ -895,6 +1146,14 @@ def _format_web_finding_markdown(item: dict[str, object] | str) -> str:
 
 
 def _format_web_finding_html(item: dict[str, object] | str) -> str:
+    """Format web finding html.
+    
+    Args:
+        item: Value for ``item``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     detail = _detail_dict_or_none(item)
     if detail is None:
         return escape(str(item))
@@ -909,6 +1168,14 @@ def _format_web_finding_html(item: dict[str, object] | str) -> str:
 
 
 def _finalize_sentence(value: str) -> str:
+    """Finalize sentence.
+    
+    Args:
+        value: Value for ``value``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     stripped = value.strip()
     if not stripped:
         return "-"
@@ -918,6 +1185,14 @@ def _finalize_sentence(value: str) -> str:
 
 
 def _build_web_source_rows(sources: list[dict[str, object] | str]) -> tuple[list[dict[str, str]], list[str]]:
+    """Build web source rows.
+    
+    Args:
+        sources: Value for ``sources``.
+    
+    Returns:
+        tuple[list[dict[str, str]], list[str]]: Value returned by this function.
+    """
     rows: list[dict[str, str]] = []
     include_source = False
     include_relevance = False
@@ -969,6 +1244,14 @@ def _build_web_source_rows(sources: list[dict[str, object] | str]) -> tuple[list
 
 
 def _render_web_findings_rows_html(findings: list[dict[str, object] | str]) -> str:
+    """Render web findings rows html.
+    
+    Args:
+        findings: Value for ``findings``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     rows = []
     for item in findings:
         rows.append(f"<li>{_format_web_finding_html(item)}</li>")
@@ -979,6 +1262,14 @@ def _render_web_findings_rows_html(findings: list[dict[str, object] | str]) -> s
 
 
 def _render_web_sources_table_html(sources: list[dict[str, object] | str]) -> str:
+    """Render web sources table html.
+    
+    Args:
+        sources: Value for ``sources``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     rows, columns = _build_web_source_rows(sources)
     if not rows:
         return "<div class='rationale'>No web-sweep sources provided.</div>"
@@ -1005,6 +1296,16 @@ def _render_web_sources_table_html(sources: list[dict[str, object] | str]) -> st
 
 
 def _render_return_scenario_row_html(scenario: dict[str, object], check_size: float, currency: str) -> str:
+    """Render return scenario row html.
+    
+    Args:
+        scenario: Value for ``scenario``.
+        check_size: Value for ``check_size``.
+        currency: Value for ``currency``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     projected_value, gain_value = _compute_scenario_values(check_size, str(scenario.get("multiple", "")))
     return (
         "<tr>"
@@ -1019,6 +1320,15 @@ def _render_return_scenario_row_html(scenario: dict[str, object], check_size: fl
 
 
 def _compute_scenario_values(check_size: float, multiple_text: str) -> tuple[float | None, float | None]:
+    """Compute scenario values.
+    
+    Args:
+        check_size: Value for ``check_size``.
+        multiple_text: Value for ``multiple_text``.
+    
+    Returns:
+        tuple[float | None, float | None]: Value returned by this function.
+    """
     multiple_value = _parse_multiple_value(multiple_text)
     if multiple_value is None:
         return None, None
@@ -1028,6 +1338,14 @@ def _compute_scenario_values(check_size: float, multiple_text: str) -> tuple[flo
 
 
 def _parse_multiple_value(multiple_text: str) -> float | None:
+    """Parse multiple value.
+    
+    Args:
+        multiple_text: Value for ``multiple_text``.
+    
+    Returns:
+        float | None: Value returned by this function.
+    """
     text = multiple_text.strip().lower().replace(",", "")
     match = re.search(r"(-?\d+(?:\.\d+)?)\s*x?", text)
     if not match:
@@ -1039,11 +1357,30 @@ def _parse_multiple_value(multiple_text: str) -> float | None:
 
 
 def _format_currency(amount: float, currency: str) -> str:
+    """Format currency.
+    
+    Args:
+        amount: Value for ``amount``.
+        currency: Value for ``currency``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     symbol = _currency_symbol(currency)
     return f"{symbol}{amount:,.0f}"
 
 
 def _format_currency_or_dash(amount: float | None, currency: str, signed: bool = False) -> str:
+    """Format currency or dash.
+    
+    Args:
+        amount: Value for ``amount``.
+        currency: Value for ``currency``.
+        signed: Value for ``signed``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     if amount is None:
         return "-"
     symbol = _currency_symbol(currency)
@@ -1055,6 +1392,14 @@ def _format_currency_or_dash(amount: float | None, currency: str, signed: bool =
 
 
 def _currency_symbol(currency: str) -> str:
+    """Currency symbol.
+    
+    Args:
+        currency: Value for ``currency``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     normalized = currency.strip().upper()
     mapping = {
         "EUR": "EUR ",
@@ -1065,6 +1410,14 @@ def _currency_symbol(currency: str) -> str:
 
 
 def _detail_dict_or_none(item: dict[str, object] | str) -> dict[str, object] | None:
+    """Detail dict or none.
+    
+    Args:
+        item: Value for ``item``.
+    
+    Returns:
+        dict[str, object] | None: Value returned by this function.
+    """
     if isinstance(item, dict):
         return item
     if isinstance(item, str):
@@ -1075,10 +1428,26 @@ def _detail_dict_or_none(item: dict[str, object] | str) -> dict[str, object] | N
 
 
 def _markdown_cell(value: str) -> str:
+    """Markdown cell.
+    
+    Args:
+        value: Value for ``value``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     return value.replace("|", "\\|").replace("\n", "<br>")
 
 
 def _format_markdown_detail(item: dict[str, object] | str) -> str:
+    """Format markdown detail.
+    
+    Args:
+        item: Value for ``item``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     if isinstance(item, str):
         return item
     if not item:
@@ -1098,6 +1467,14 @@ def _format_markdown_detail(item: dict[str, object] | str) -> str:
 
 
 def _format_html_detail(item: dict[str, object] | str) -> str:
+    """Format html detail.
+    
+    Args:
+        item: Value for ``item``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     if isinstance(item, str):
         return escape(item)
     if not item:
@@ -1120,6 +1497,14 @@ def _format_html_detail(item: dict[str, object] | str) -> str:
 
 
 def _normalize_detail_item(item: object) -> dict[str, object] | str:
+    """Normalize detail item.
+    
+    Args:
+        item: Value for ``item``.
+    
+    Returns:
+        dict[str, object] | str: Value returned by this function.
+    """
     if isinstance(item, dict):
         return {str(key): value for key, value in item.items()}
     if isinstance(item, str):
@@ -1130,6 +1515,14 @@ def _normalize_detail_item(item: object) -> dict[str, object] | str:
 
 
 def _try_parse_detail_mapping(raw: str) -> dict[str, object] | None:
+    """Try parse detail mapping.
+    
+    Args:
+        raw: Value for ``raw``.
+    
+    Returns:
+        dict[str, object] | None: Value returned by this function.
+    """
     text = raw.strip()
     if not (text.startswith("{") and text.endswith("}")):
         return None
@@ -1152,6 +1545,18 @@ def _normalize_assessment_process(
     web_sweep_sources: list[dict[str, object] | str],
     return_scenarios: list[dict[str, object]],
 ) -> dict[str, object]:
+    """Normalize assessment process.
+    
+    Args:
+        process_raw: Value for ``process_raw``.
+        category_rationales: Value for ``category_rationales``.
+        web_sweep_findings: Value for ``web_sweep_findings``.
+        web_sweep_sources: Value for ``web_sweep_sources``.
+        return_scenarios: Value for ``return_scenarios``.
+    
+    Returns:
+        dict[str, object]: Value returned by this function.
+    """
     del process_raw, category_rationales, web_sweep_findings, web_sweep_sources, return_scenarios
     return {
         "single_deal_equivalent": "yes",
@@ -1162,14 +1567,15 @@ def _normalize_assessment_process(
     }
 
 
-def _has_reconciliation(detail: dict[str, object] | str) -> bool:
-    if isinstance(detail, dict):
-        value = detail.get("reconciliation")
-        return value not in (None, "")
-    return "reconciliation" in detail.lower()
-
-
 def _infer_dilution_assumption_from_scenarios(return_scenarios: list[dict[str, object]]) -> str:
+    """Infer dilution assumption from scenarios.
+    
+    Args:
+        return_scenarios: Value for ``return_scenarios``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     observed: list[bool] = []
     for scenario in return_scenarios:
         candidate = scenario.get("includes_dilution")
@@ -1189,6 +1595,14 @@ def _infer_dilution_assumption_from_scenarios(return_scenarios: list[dict[str, o
 
 
 def _parse_bool_or_none(value: object) -> bool | None:
+    """Parse bool or none.
+    
+    Args:
+        value: Value for ``value``.
+    
+    Returns:
+        bool | None: Value returned by this function.
+    """
     if isinstance(value, bool):
         return value
     if isinstance(value, str):

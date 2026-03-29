@@ -1,3 +1,5 @@
+"""Load and normalize investor profile fields from local markdown files."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -20,6 +22,15 @@ KEY_ALIASES = {
 
 
 def load_investor_profile(profile_path: Path) -> InvestorProfile:
+    """Parse a profile markdown file into an ``InvestorProfile``.
+
+    Args:
+        profile_path: Path to profile markdown file.
+
+    Returns:
+        Normalized investor profile. Missing files return defaults.
+    """
+
     if not profile_path.exists():
         return InvestorProfile()
 
@@ -45,6 +56,15 @@ def load_investor_profile(profile_path: Path) -> InvestorProfile:
 
 
 def _to_list(value: str) -> list[str]:
+    """Split a free-form list field into normalized string values.
+    
+    Args:
+        value: Value for ``value``.
+    
+    Returns:
+        list[str]: Value returned by this function.
+    """
+
     if not value:
         return []
     chunks = re.split(r",|/|;|\||\s+&\s+", value)
@@ -52,11 +72,29 @@ def _to_list(value: str) -> list[str]:
 
 
 def _to_int(value: str) -> int:
+    """Extract digits from a string and convert to int (or 0).
+    
+    Args:
+        value: Value for ``value``.
+    
+    Returns:
+        int: Value returned by this function.
+    """
+
     digits = "".join(ch for ch in value if ch.isdigit())
     return int(digits) if digits else 0
 
 
 def _resolve_ticket_typical(values: dict[str, str]) -> int:
+    """Resolve `ticket_typical` from direct or min/typical/max profile fields.
+    
+    Args:
+        values: Value for ``values``.
+    
+    Returns:
+        int: Value returned by this function.
+    """
+
     direct = _to_int(values.get("ticket_typical", "0"))
     if direct > 0:
         return direct

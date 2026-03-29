@@ -1,30 +1,44 @@
+"""PDF rendering helpers used by batch report generation."""
+
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
 
 def render_pdf_with_playwright(input_html: Path, output_pdf: Path) -> None:
-    output_pdf.parent.mkdir(parents=True, exist_ok=True)
+    """Render an HTML report to PDF using Playwright.
 
-    python_error: Exception | None = None
+    Args:
+        input_html: Source HTML path.
+        output_pdf: Destination PDF path.
+    
+    Returns:
+        None.
+    """
+
+    output_pdf.parent.mkdir(parents=True, exist_ok=True)
     try:
         _render_with_python_playwright(input_html, output_pdf)
         return
     except Exception as exc:  # noqa: BLE001
-        python_error = exc
-
-    try:
-        _render_with_node_playwright(input_html, output_pdf)
-        return
-    except Exception as node_error:  # noqa: BLE001
         raise RuntimeError(
-            "Could not render PDF. Install Playwright for Python or Node with Chromium browser. "
-            f"Python error: {python_error}; Node error: {node_error}"
-        ) from node_error
+            "Could not render PDF with Python Playwright. "
+            "Install Python package `playwright` and run `python -m playwright install chromium`. "
+            f"Original error: {exc}"
+        ) from exc
 
 
 def _render_with_python_playwright(input_html: Path, output_pdf: Path) -> None:
+    """Render PDF using the Python Playwright runtime.
+    
+    Args:
+        input_html: Value for ``input_html``.
+        output_pdf: Value for ``output_pdf``.
+    
+    Returns:
+        None.
+    """
+
     from playwright.sync_api import sync_playwright  # type: ignore
 
     with sync_playwright() as playwright:
@@ -38,31 +52,3 @@ def _render_with_python_playwright(input_html: Path, output_pdf: Path) -> None:
             margin={"top": "16mm", "right": "12mm", "bottom": "16mm", "left": "12mm"},
         )
         browser.close()
-
-
-def _render_with_node_playwright(input_html: Path, output_pdf: Path) -> None:
-    script = r"""
-const { chromium } = require('playwright');
-(async () => {
-  const input = process.argv[1];
-  const output = process.argv[2];
-  const browser = await chromium.launch();
-  const page = await browser.newPage();
-  const url = 'file://' + input;
-  await page.goto(url, { waitUntil: 'networkidle' });
-  await page.pdf({
-    path: output,
-    format: 'A4',
-    printBackground: true,
-    margin: { top: '16mm', right: '12mm', bottom: '16mm', left: '12mm' },
-  });
-  await browser.close();
-})();
-"""
-
-    subprocess.run(
-        ["node", "-e", script, str(input_html.resolve()), str(output_pdf.resolve())],
-        check=True,
-        capture_output=True,
-        text=True,
-    )

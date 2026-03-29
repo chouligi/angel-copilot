@@ -1,3 +1,5 @@
+"""Document extraction utilities for text, PDF, DOCX, and ZIP sources."""
+
 from __future__ import annotations
 
 import io
@@ -8,6 +10,15 @@ from angelcopilot_batch.models import EvidenceBlock, EvidenceBundle
 
 
 def extract_evidence_bundle(file_paths: list[Path]) -> EvidenceBundle:
+    """Extract text evidence and warnings from supported input files.
+
+    Args:
+        file_paths: Candidate document/archive files to parse.
+
+    Returns:
+        Evidence bundle containing de-duplicated text blocks and warnings.
+    """
+
     bundle = EvidenceBundle()
     seen_text: set[str] = set()
 
@@ -37,6 +48,17 @@ def extract_evidence_bundle(file_paths: list[Path]) -> EvidenceBundle:
 
 
 def _extract_zip_archive(file_path: Path, bundle: EvidenceBundle, seen_text: set[str]) -> None:
+    """Extract supported archive members into the evidence bundle.
+    
+    Args:
+        file_path: Value for ``file_path``.
+        bundle: Value for ``bundle``.
+        seen_text: Value for ``seen_text``.
+    
+    Returns:
+        None.
+    """
+
     try:
         with zipfile.ZipFile(file_path) as archive:
             handled_any_supported = False
@@ -66,6 +88,15 @@ def _extract_zip_archive(file_path: Path, bundle: EvidenceBundle, seen_text: set
 
 
 def _get_extractor(extension: str):  # noqa: ANN202
+    """Return a file extractor callable for a given extension.
+    
+    Args:
+        extension: Value for ``extension``.
+    
+    Returns:
+        object: Value returned by this function.
+    """
+
     if extension in {".txt", ".md"}:
         return _extract_text_file
     if extension == ".pdf":
@@ -76,10 +107,26 @@ def _get_extractor(extension: str):  # noqa: ANN202
 
 
 def _extract_text_file(file_path: Path) -> str:
+    """Extract text file.
+    
+    Args:
+        file_path: Value for ``file_path``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     return file_path.read_text(encoding="utf-8", errors="ignore")
 
 
 def _extract_pdf_file(file_path: Path) -> str:
+    """Extract pdf file.
+    
+    Args:
+        file_path: Value for ``file_path``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     try:
         from pypdf import PdfReader  # type: ignore
     except Exception as exc:  # noqa: BLE001
@@ -91,6 +138,14 @@ def _extract_pdf_file(file_path: Path) -> str:
 
 
 def _extract_docx_file(file_path: Path) -> str:
+    """Extract docx file.
+    
+    Args:
+        file_path: Value for ``file_path``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     try:
         from docx import Document  # type: ignore
     except Exception as exc:  # noqa: BLE001
@@ -102,6 +157,15 @@ def _extract_docx_file(file_path: Path) -> str:
 
 
 def _extract_from_bytes(extension: str, payload: bytes) -> str:
+    """Extract from bytes.
+    
+    Args:
+        extension: Value for ``extension``.
+        payload: Value for ``payload``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     if extension in {".txt", ".md"}:
         return payload.decode("utf-8", errors="ignore")
     if extension == ".pdf":
@@ -112,6 +176,14 @@ def _extract_from_bytes(extension: str, payload: bytes) -> str:
 
 
 def _extract_pdf_bytes(payload: bytes) -> str:
+    """Extract pdf bytes.
+    
+    Args:
+        payload: Value for ``payload``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     try:
         from pypdf import PdfReader  # type: ignore
     except Exception as exc:  # noqa: BLE001
@@ -123,6 +195,14 @@ def _extract_pdf_bytes(payload: bytes) -> str:
 
 
 def _extract_docx_bytes(payload: bytes) -> str:
+    """Extract docx bytes.
+    
+    Args:
+        payload: Value for ``payload``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     try:
         from docx import Document  # type: ignore
     except Exception as exc:  # noqa: BLE001
@@ -134,6 +214,18 @@ def _extract_docx_bytes(payload: bytes) -> str:
 
 
 def _append_text_block(bundle: EvidenceBundle, seen_text: set[str], source_path: Path, text: str) -> None:
+    """Append non-empty, de-duplicated extracted text to the bundle.
+    
+    Args:
+        bundle: Value for ``bundle``.
+        seen_text: Value for ``seen_text``.
+        source_path: Value for ``source_path``.
+        text: Value for ``text``.
+    
+    Returns:
+        None.
+    """
+
     if not text:
         return
 

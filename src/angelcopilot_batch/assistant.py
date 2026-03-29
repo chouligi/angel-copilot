@@ -1,3 +1,5 @@
+"""Assistant runner abstractions and payload validation helpers."""
+
 from __future__ import annotations
 
 import ast
@@ -37,7 +39,19 @@ REQUIRED_PAYLOAD_FIELDS = (
 
 
 class CodexRunner:
+    """Run a single-deal assessment prompt through the Codex CLI."""
+
     def run_assessment(self, prompt: str, cwd: Path) -> dict[str, object]:
+        """Execute Codex, parse JSON response, and validate payload fields.
+
+        Args:
+            prompt: Prompt passed to the assistant CLI.
+            cwd: Working directory used for command execution.
+
+        Returns:
+            Validated assessment payload.
+        """
+
         command = ["codex", "--search", "exec", "--skip-git-repo-check", "-C", str(cwd), "-"]
         result = subprocess.run(command, input=prompt, capture_output=True, text=True, check=False)
         if result.returncode != 0:
@@ -48,7 +62,19 @@ class CodexRunner:
 
 
 class ClaudeRunner:
+    """Run a single-deal assessment prompt through the Claude CLI."""
+
     def run_assessment(self, prompt: str, cwd: Path) -> dict[str, object]:
+        """Execute Claude, parse JSON response, and validate payload fields.
+
+        Args:
+            prompt: Prompt passed to the assistant CLI.
+            cwd: Working directory used for command execution.
+
+        Returns:
+            Validated assessment payload.
+        """
+
         command = ["claude", "-p"]
         result = subprocess.run(command, input=prompt, capture_output=True, text=True, check=False, cwd=str(cwd))
         if result.returncode != 0:
@@ -59,10 +85,31 @@ class ClaudeRunner:
 
 
 class CodexIntakeClassifier:
+    """Codex-backed folder classifier used by smart intake mode."""
+
     def __init__(self, cwd: Path | None = None) -> None:
+        """Initialize classifier execution context.
+        
+        Args:
+            cwd: Optional working directory for codex CLI calls.
+        
+        Returns:
+            None.
+        """
+
         self.cwd = cwd or Path.cwd()
 
     def is_deal_folder(self, folder_name: str, parent_name: str | None = None) -> bool:
+        """Return whether a folder likely represents a startup deal.
+
+        Args:
+            folder_name: Folder basename to classify.
+            parent_name: Optional parent folder name for context.
+
+        Returns:
+            ``True`` when folder likely contains a company deal.
+        """
+
         prompt = build_intake_classification_prompt(folder_name=folder_name, parent_name=parent_name)
         command = ["codex", "--search", "exec", "--skip-git-repo-check", "-C", str(self.cwd), "-"]
         result = subprocess.run(command, input=prompt, capture_output=True, text=True, check=False)
@@ -73,10 +120,31 @@ class CodexIntakeClassifier:
 
 
 class ClaudeIntakeClassifier:
+    """Claude-backed folder classifier used by smart intake mode."""
+
     def __init__(self, cwd: Path | None = None) -> None:
+        """Initialize classifier execution context.
+        
+        Args:
+            cwd: Optional working directory for claude CLI calls.
+        
+        Returns:
+            None.
+        """
+
         self.cwd = cwd or Path.cwd()
 
     def is_deal_folder(self, folder_name: str, parent_name: str | None = None) -> bool:
+        """Return whether a folder likely represents a startup deal.
+
+        Args:
+            folder_name: Folder basename to classify.
+            parent_name: Optional parent folder name for context.
+
+        Returns:
+            ``True`` when folder likely contains a company deal.
+        """
+
         prompt = build_intake_classification_prompt(folder_name=folder_name, parent_name=parent_name)
         command = ["claude", "-p"]
         result = subprocess.run(command, input=prompt, capture_output=True, text=True, check=False, cwd=str(self.cwd))
@@ -87,6 +155,16 @@ class ClaudeIntakeClassifier:
 
 
 def build_intake_classification_prompt(folder_name: str, parent_name: str | None) -> str:
+    """Build strict-JSON classification prompt for folder intake decisions.
+
+    Args:
+        folder_name: Folder basename to classify.
+        parent_name: Optional parent folder name used as additional context.
+
+    Returns:
+        Prompt text instructing the assistant to return a strict JSON decision.
+    """
+
     parent_label = parent_name or "-"
     return (
         "Classify whether this folder name likely represents a startup deal/company folder "
@@ -98,8 +176,19 @@ def build_intake_classification_prompt(folder_name: str, parent_name: str | None
         f"Parent folder: {parent_label}\n"
     )
 
-
 def parse_json_object(raw_output: str) -> dict[str, object]:
+    """Parse a JSON object from raw assistant output, including fenced snippets.
+
+    Args:
+        raw_output: Assistant output that should include a JSON object.
+
+    Returns:
+        Parsed JSON dictionary.
+
+    Raises:
+        ValueError: If no valid JSON object can be extracted.
+    """
+
     cleaned = raw_output.strip()
     try:
         parsed = json.loads(cleaned)
@@ -124,10 +213,28 @@ def parse_json_object(raw_output: str) -> dict[str, object]:
 
 
 def parse_assessment_json(raw_output: str) -> dict[str, object]:
+    """Parse and return the top-level assessment JSON object.
+
+    Args:
+        raw_output: Raw assistant output expected to contain assessment JSON.
+
+    Returns:
+        Parsed top-level assessment dictionary.
+    """
+
     return parse_json_object(raw_output)
 
 
 def validate_assessment_payload(payload: dict[str, object]) -> dict[str, object]:
+    """Validate and normalize assistant assessment payload structure/types.
+
+    Args:
+        payload: Raw parsed JSON object returned by an assistant.
+
+    Returns:
+        Normalized payload with required fields and canonical value types.
+    """
+
     for field in REQUIRED_PAYLOAD_FIELDS:
         if field not in payload:
             raise ValueError(f"Missing required field: {field}")
@@ -212,6 +319,15 @@ def validate_assessment_payload(payload: dict[str, object]) -> dict[str, object]
 
 
 def build_assistant_runner(name: str):
+    """Build the configured assistant runner.
+
+    Args:
+        name: Assistant backend name (``codex`` or ``claude``).
+
+    Returns:
+        Runner instance implementing ``run_assessment``.
+    """
+
     normalized = name.strip().lower()
     if normalized == "codex":
         _require_command("codex")
@@ -223,6 +339,16 @@ def build_assistant_runner(name: str):
 
 
 def build_intake_classifier(name: str, cwd: Path | None = None):
+    """Build intake folder classifier for smart intake mode.
+
+    Args:
+        name: Assistant backend name (``codex`` or ``claude``).
+        cwd: Optional working directory for the classifier command.
+
+    Returns:
+        Classifier object or ``None`` when unsupported.
+    """
+
     normalized = name.strip().lower()
     if normalized == "codex":
         _require_command("codex")
@@ -234,6 +360,16 @@ def build_intake_classifier(name: str, cwd: Path | None = None):
 
 
 def _as_list(value: object) -> list[object]:
+    """Normalize scalar/None values into list form.
+
+    Args:
+        value: Candidate list-like payload value.
+
+    Returns:
+        Original list when already a list, empty list for ``None``, otherwise
+        a single-item list containing ``value``.
+    """
+
     if isinstance(value, list):
         return value
     if value is None:
@@ -242,6 +378,16 @@ def _as_list(value: object) -> list[object]:
 
 
 def _normalize_detail_item(item: object) -> dict[str, object] | str:
+    """Normalize a citation/detail item into stable output form.
+
+    Args:
+        item: Raw item from assistant payload.
+
+    Returns:
+        Dictionary with normalized scalar values when parseable as mapping;
+        otherwise a string representation.
+    """
+
     if isinstance(item, dict):
         normalized: dict[str, object] = {}
         for key, value in item.items():
@@ -255,6 +401,15 @@ def _normalize_detail_item(item: object) -> dict[str, object] | str:
 
 
 def _normalize_detail_scalar(value: object) -> object:
+    """Normalize nested citation/detail scalar values.
+
+    Args:
+        value: Raw scalar/list/dict value from a detail mapping.
+
+    Returns:
+        JSON-serializable normalized value.
+    """
+
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     if isinstance(value, list):
@@ -265,6 +420,15 @@ def _normalize_detail_scalar(value: object) -> object:
 
 
 def _try_parse_detail_mapping(raw: str) -> dict[str, object] | None:
+    """Try parsing a stringified mapping into a normalized dictionary.
+
+    Args:
+        raw: String that may represent a mapping literal/object.
+
+    Returns:
+        Parsed mapping when successful, otherwise ``None``.
+    """
+
     text = raw.strip()
     if not (text.startswith("{") and text.endswith("}")):
         return None
@@ -281,6 +445,19 @@ def _try_parse_detail_mapping(raw: str) -> dict[str, object] | None:
 
 
 def _normalize_bool(value: object, field_name: str) -> bool:
+    """Coerce common boolean-like payload values into bool.
+
+    Args:
+        value: Raw value expected to represent a boolean.
+        field_name: Payload field path used in validation errors.
+
+    Returns:
+        Normalized boolean value.
+
+    Raises:
+        ValueError: If value cannot be interpreted as boolean.
+    """
+
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
@@ -293,6 +470,18 @@ def _normalize_bool(value: object, field_name: str) -> bool:
 
 
 def _require_command(command: str) -> None:
+    """Ensure a required CLI binary is available in PATH.
+    
+    Args:
+        command: CLI executable name to resolve.
+    
+    Raises:
+        RuntimeError: If the executable cannot be found.
+    
+    Returns:
+        None.
+    """
+
     if shutil.which(command):
         return
     raise RuntimeError(

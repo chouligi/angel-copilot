@@ -91,6 +91,10 @@ Example installed skill path (Codex local skill install):
 ~/.codex/skills/angel-copilot/SKILL.md
 ```
 
+Profile behavior in skill flow:
+- If `.angelcopilot/profile.md` exists, Angel Copilot auto-loads it at assessment start and confirms that it is using the profile.
+- If that file is missing, Angel Copilot runs a generic assessment and states that explicitly.
+
 Expected output:
 - A structured deal assessment memo in the chat response.
 - You can save a copy at `examples/sample-output/quick-deal-memo/` (see placeholder there).
@@ -98,6 +102,39 @@ Expected output:
 ### B) Dealflow triage (batch flow)
 
 This workflow validates a batch of startup folders, scores them consistently, and generates a comparative report with ranked attention priorities.
+
+How Dealflow Triage discovers deals:
+1. You point `--deals-root` to a local folder containing your startup/deal documents.
+2. The CLI interprets that folder using `--layout`:
+  - `syndicates`: top-level folders are source/group folders, and deal folders are inside them.
+  - `flat`: top-level folders/files are treated as deals directly.
+3. It scans for supported documents (`.txt`, `.md`, `.pdf`, `.docx`, `.zip`).
+4. It computes each deal's latest activity timestamp from supported files/folders.
+5. It keeps only deals active in the last `--since-days` days.
+6. `batch validate` shows which deals were detected; `batch run` scores those detected deals.
+
+Directory examples for `--deals-root`:
+
+```text
+# --layout syndicates
+/deals-root/
+  SourceA/
+    startup-a/
+      deck.pdf
+      memo.md
+  PersonalCRM/
+    startup-b/
+      one-pager.docx
+```
+
+```text
+# --layout flat
+/deals-root/
+  startup-a/
+    deck.pdf
+  startup-b/
+    memo.md
+```
 
 Use synthetic fixtures first (demo):
 
@@ -144,6 +181,10 @@ uv run python -m angelcopilot_batch.cli setup
 ```
 
 Run Dealflow Triage on your own deal folders:
+
+Layout quick guide:
+- `--layout syndicates`: top-level folders are group/source folders that contain deal folders (for example, `/deals-root/SourceA/startup-a/`).
+- `--layout flat`: top-level folders/files under `--deals-root` are deals directly (for example, `/deals-root/startup-a/`).
 
 ```bash
 uv run python -m angelcopilot_batch.cli batch validate \

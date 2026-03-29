@@ -1,3 +1,5 @@
+"""Prepare per-deal workspaces with flattened, supported input documents."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -14,6 +16,8 @@ MAX_ZIP_RECURSION_DEPTH = 6
 
 @dataclass
 class PreparedDealWorkspace:
+    """Temporary prepared docs plus provenance and extraction warnings."""
+
     workspace_path: Path
     files_used: list[str]
     warnings: list[str]
@@ -24,6 +28,17 @@ def prepare_deal_workspace(
     supported_files: list[Path],
     deal_id: str,
 ) -> PreparedDealWorkspace:
+    """Copy/extract supported deal files into an isolated temp workspace.
+
+    Args:
+        deal_path: Original deal folder/file path.
+        supported_files: Supported documents discovered during intake.
+        deal_id: Deal identifier used for temp workspace naming.
+
+    Returns:
+        Prepared workspace metadata with provenance and warnings.
+    """
+
     workspace = Path(tempfile.mkdtemp(prefix=f"angelcopilot_{_slugify(deal_id)}_"))
     files_used: list[str] = []
     warnings: list[str] = []
@@ -59,6 +74,15 @@ def prepare_deal_workspace(
 
 
 def cleanup_prepared_workspace(workspace: PreparedDealWorkspace) -> None:
+    """Delete a previously prepared temporary workspace.
+    
+    Args:
+        workspace: Value for ``workspace``.
+    
+    Returns:
+        None.
+    """
+
     shutil.rmtree(workspace.workspace_path, ignore_errors=True)
 
 
@@ -69,6 +93,19 @@ def _extract_zip_recursive_from_path(
     files_used: list[str],
     warnings: list[str],
 ) -> int:
+    """Extract supported documents from a zip path (including nested zips).
+    
+    Args:
+        zip_path: Value for ``zip_path``.
+        output_root: Value for ``output_root``.
+        used_targets: Value for ``used_targets``.
+        files_used: Value for ``files_used``.
+        warnings: Value for ``warnings``.
+    
+    Returns:
+        int: Value returned by this function.
+    """
+
     try:
         with zipfile.ZipFile(zip_path) as archive:
             return _extract_zip_archive_members(
@@ -94,6 +131,21 @@ def _extract_zip_archive_members(
     files_used: list[str],
     warnings: list[str],
 ) -> int:
+    """Extract supported archive members into the workspace docs directory.
+    
+    Args:
+        archive: Value for ``archive``.
+        output_root: Value for ``output_root``.
+        label_prefix: Value for ``label_prefix``.
+        recursion_depth: Value for ``recursion_depth``.
+        used_targets: Value for ``used_targets``.
+        files_used: Value for ``files_used``.
+        warnings: Value for ``warnings``.
+    
+    Returns:
+        int: Value returned by this function.
+    """
+
     if recursion_depth > MAX_ZIP_RECURSION_DEPTH:
         warnings.append(f"Archive recursion depth exceeded for: {label_prefix}")
         return 0
@@ -146,6 +198,21 @@ def _extract_nested_zip_bytes(
     files_used: list[str],
     warnings: list[str],
 ) -> int:
+    """Extract nested zip payload bytes using the same archive rules.
+    
+    Args:
+        payload: Value for ``payload``.
+        output_root: Value for ``output_root``.
+        label_prefix: Value for ``label_prefix``.
+        recursion_depth: Value for ``recursion_depth``.
+        used_targets: Value for ``used_targets``.
+        files_used: Value for ``files_used``.
+        warnings: Value for ``warnings``.
+    
+    Returns:
+        int: Value returned by this function.
+    """
+
     try:
         from io import BytesIO
 
@@ -165,6 +232,15 @@ def _extract_nested_zip_bytes(
 
 
 def _safe_member_relative_path(member_name: str) -> Path:
+    """Normalize archive member names to safe relative paths.
+    
+    Args:
+        member_name: Value for ``member_name``.
+    
+    Returns:
+        Path: Value returned by this function.
+    """
+
     parts = [
         part
         for part in PurePosixPath(member_name).parts
@@ -176,11 +252,31 @@ def _safe_member_relative_path(member_name: str) -> Path:
 
 
 def _slugify(raw: str) -> str:
+    """Create a filesystem-safe slug for temporary directory naming.
+    
+    Args:
+        raw: Value for ``raw``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
+
     sanitized = "".join(char.lower() if char.isalnum() else "_" for char in raw).strip("_")
     return sanitized or "deal"
 
 
 def _unique_target_name(output_root: Path, desired_name: str, used_targets: set[Path]) -> str:
+    """Generate a collision-safe filename within the target workspace.
+    
+    Args:
+        output_root: Value for ``output_root``.
+        desired_name: Value for ``desired_name``.
+        used_targets: Value for ``used_targets``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
+
     candidate = output_root / desired_name
     if candidate not in used_targets and not candidate.exists():
         used_targets.add(candidate)

@@ -1,3 +1,5 @@
+"""Apply deterministic scoring and attention rules to assessed deals."""
+
 from __future__ import annotations
 
 from dataclasses import replace
@@ -17,6 +19,16 @@ CATEGORY_WEIGHTS = {
 
 
 def apply_scoring_rules(assessment: AssessmentResult, profile: InvestorProfile) -> AssessmentResult:
+    """Compute weighted score, verdict, attention flag, and profile fit.
+
+    Args:
+        assessment: Normalized single-deal assessment payload.
+        profile: Investor profile used for fit and attention heuristics.
+
+    Returns:
+        Updated assessment with derived scoring fields.
+    """
+
     weighted_score = _compute_weighted_score(assessment.category_scores)
     verdict = _map_verdict(weighted_score)
     profile_fit = _compute_profile_fit(assessment, profile)
@@ -39,6 +51,15 @@ def apply_scoring_rules(assessment: AssessmentResult, profile: InvestorProfile) 
 
 
 def _compute_weighted_score(category_scores: dict[str, float]) -> float:
+    """Compute weighted rubric score using `CATEGORY_WEIGHTS`.
+    
+    Args:
+        category_scores: Value for ``category_scores``.
+    
+    Returns:
+        float: Value returned by this function.
+    """
+
     total = 0.0
     for category, weight in CATEGORY_WEIGHTS.items():
         total += float(category_scores.get(category, 0.0)) * weight
@@ -46,6 +67,15 @@ def _compute_weighted_score(category_scores: dict[str, float]) -> float:
 
 
 def _map_verdict(weighted_score: float) -> str:
+    """Map weighted score to `INVEST`/`WAIT`/`PASS`.
+    
+    Args:
+        weighted_score: Value for ``weighted_score``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
+
     if weighted_score >= 4.2:
         return "INVEST"
     if weighted_score >= 3.5:
@@ -54,6 +84,16 @@ def _map_verdict(weighted_score: float) -> str:
 
 
 def _compute_profile_fit(assessment: AssessmentResult, profile: InvestorProfile) -> float:
+    """Estimate profile fit from sector and geography overlap.
+    
+    Args:
+        assessment: Value for ``assessment``.
+        profile: Value for ``profile``.
+    
+    Returns:
+        float: Value returned by this function.
+    """
+
     criteria: list[float] = []
 
     if profile.sectors_themes:
@@ -69,6 +109,17 @@ def _compute_profile_fit(assessment: AssessmentResult, profile: InvestorProfile)
 
 
 def _evaluate_attention(verdict: str, weighted_score: float, profile_fit: float) -> tuple[bool, str]:
+    """Determine whether a deal should be highlighted for follow-up.
+    
+    Args:
+        verdict: Value for ``verdict``.
+        weighted_score: Value for ``weighted_score``.
+        profile_fit: Value for ``profile_fit``.
+    
+    Returns:
+        tuple[bool, str]: Value returned by this function.
+    """
+
     if verdict == "INVEST":
         return True, "INVEST verdict and risk gates passed."
 
@@ -79,6 +130,15 @@ def _evaluate_attention(verdict: str, weighted_score: float, profile_fit: float)
 
 
 def _matches_any(values: list[str], preferences: list[str]) -> bool:
+    """Matches any.
+    
+    Args:
+        values: Value for ``values``.
+        preferences: Value for ``preferences``.
+    
+    Returns:
+        bool: Value returned by this function.
+    """
     normalized_values = [_normalize_match_text(item) for item in values if item.strip()]
     normalized_preferences = [_normalize_match_text(item) for item in preferences if item.strip()]
 
@@ -96,11 +156,27 @@ def _matches_any(values: list[str], preferences: list[str]) -> bool:
 
 
 def _is_hard_risk(flag: str) -> bool:
+    """Is hard risk.
+    
+    Args:
+        flag: Value for ``flag``.
+    
+    Returns:
+        bool: Value returned by this function.
+    """
     normalized = flag.strip().lower()
     return normalized.startswith("hard:") or "hard-risk" in normalized or "hard risk" in normalized
 
 
 def _normalize_match_text(value: str) -> str:
+    """Normalize match text.
+    
+    Args:
+        value: Value for ``value``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
     text = value.strip().lower()
     replacements = {
         "u.s.a.": "united states",

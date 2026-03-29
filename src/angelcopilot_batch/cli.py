@@ -1,3 +1,5 @@
+"""Command-line interface for batch run, validate, setup, and report rebuild."""
+
 from __future__ import annotations
 
 import argparse
@@ -5,6 +7,7 @@ from dataclasses import replace
 from pathlib import Path
 import subprocess
 import sys
+from textwrap import dedent
 
 from angelcopilot_batch.intake import discover_recent_deals
 from angelcopilot_batch.job import run_batch_job
@@ -17,7 +20,64 @@ from angelcopilot_batch.reporting import (
 from angelcopilot_batch.scoring import apply_scoring_rules
 
 
+class _HelpFormatter(argparse.RawTextHelpFormatter):
+    """Format help text with readable sections and selective defaults."""
+
+    def _get_help_string(self, action: argparse.Action) -> str:
+        """Get help string.
+        
+        Args:
+            action: Value for ``action``.
+        
+        Returns:
+            str: Value returned by this function.
+        """
+        help_text = action.help or ""
+        if "%(default)" in help_text:
+            return help_text
+        if action.required:
+            return help_text
+        if action.default in {None, argparse.SUPPRESS}:
+            return help_text
+        if isinstance(action, (argparse._StoreTrueAction, argparse._StoreFalseAction)):  # noqa: SLF001
+            return help_text
+        return f"{help_text} (default: %(default)s)"
+
+
+LAYOUT_HELP = dedent(
+    """
+    How to interpret --deals-root:
+      syndicates: top-level folders are group/source folders that contain deal folders
+      flat: top-level folders/files are deals directly
+    """
+).strip()
+
+DEALS_ROOT_HELP = dedent(
+    """
+    Root folder containing your deal files/folders.
+    Use --layout syndicates if deals are one level below group folders,
+    or --layout flat if deals are directly under this root.
+    """
+).strip()
+INTAKE_FILTER_HELP = dedent(
+    """
+    Candidate deal-folder filtering mode:
+      smart: assistant classifier + fallback heuristics for deciding whether a folder is a startup/deal folder
+      rules: heuristics only (faster; excludes admin/legal/docs-like folders)
+    """
+).strip()
+
+
 def main(argv: list[str] | None = None) -> int:
+    """Parse CLI args and dispatch to the selected subcommand.
+
+    Args:
+        argv: Optional CLI arguments. When omitted, uses ``sys.argv``.
+
+    Returns:
+        Process-style exit code.
+    """
+
     parser = _build_parser()
     args = parser.parse_args(argv)
 
@@ -38,6 +98,15 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _run_batch(args: argparse.Namespace) -> int:
+    """Execute `batch run` and print a compact completion summary.
+    
+    Args:
+        args: Value for ``args``.
+    
+    Returns:
+        int: Value returned by this function.
+    """
+
     top_level_containers = args.layout == "syndicates"
     result = run_batch_job(
         deals_root=args.deals_root,
@@ -60,6 +129,15 @@ def _run_batch(args: argparse.Namespace) -> int:
 
 
 def _validate_batch(args: argparse.Namespace) -> int:
+    """Execute `batch validate` and print discovered deal candidates.
+    
+    Args:
+        args: Value for ``args``.
+    
+    Returns:
+        int: Value returned by this function.
+    """
+
     deals_root = Path(args.deals_root).expanduser().resolve()
     deals = discover_recent_deals(
         deals_root=deals_root,
@@ -76,6 +154,15 @@ def _validate_batch(args: argparse.Namespace) -> int:
 
 
 def _rerender_report(args: argparse.Namespace) -> int:
+    """Execute `batch report` to regenerate artifacts from stored JSON.
+    
+    Args:
+        args: Value for ``args``.
+    
+    Returns:
+        int: Value returned by this function.
+    """
+
     output_dir = Path(args.out).expanduser().resolve()
     source_run_id = args.run_id
     target_run_id = args.target_run_id or source_run_id
@@ -122,134 +209,169 @@ def _rerender_report(args: argparse.Namespace) -> int:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="AngelCopilot batch runner")
+    """Construct the argparse command tree for the CLI.
+    
+    Args:
+        None.
+    
+    Returns:
+        argparse.ArgumentParser: Value returned by this function.
+    """
+
+    parser = argparse.ArgumentParser(
+        description=dedent(
+            """
+            AngelCopilot batch CLI.
+            Use a subcommand below, then add -h for command-specific help.
+            """
+        ).strip(),
+        formatter_class=_HelpFormatter,
+    )
     subparsers = parser.add_subparsers(dest="command")
 
     subparsers.add_parser(
         "setup",
         help="Install local browser dependency for PDF generation",
         description="Install Chromium via Playwright for PDF report rendering.",
+        formatter_class=_HelpFormatter,
     )
 
     batch_parser = subparsers.add_parser(
         "batch",
-        help="Batch commands",
+        help="Batch workflows",
         description="Run, validate, or rerender AngelCopilot batch outputs.",
+        formatter_class=_HelpFormatter,
+        epilog=dedent(
+            """
+            Examples:
+              uv run python -m angelcopilot_batch.cli batch validate -h
+              uv run python -m angelcopilot_batch.cli batch run -h
+              uv run python -m angelcopilot_batch.cli batch report -h
+            """
+        ).strip(),
     )
     batch_subparsers = batch_parser.add_subparsers(dest="batch_command")
 
     run_parser = batch_subparsers.add_parser(
         "run",
-        help="Run weekly batch assessments",
+        help="Run batch assessments",
         description="Discover recent deals, prepare documents, run assessments, and write outputs.",
+        formatter_class=_HelpFormatter,
+        epilog=dedent(
+            """
+            Examples:
+              # Deals are one level under source folders (source A, personal CRM, etc.)
+              uv run python -m angelcopilot_batch.cli batch run \\
+                --deals-root /path/to/deals \\
+                --layout syndicates \\
+                --since-days 7 \\
+                --assistant codex
+
+              # Deals live directly under --deals-root
+              uv run python -m angelcopilot_batch.cli batch run \\
+                --deals-root /path/to/deals \\
+                --layout flat \\
+                --since-days 30 \\
+                --assistant codex
+            """
+        ).strip(),
     )
-    run_parser.add_argument(
-        "--deals-root",
-        required=True,
-        help=(
-            "Root folder containing deals. "
-            "Use parent-of-syndicates with --layout syndicates, or one-syndicate/deals folder with --layout flat."
-        ),
-    )
-    run_parser.add_argument("--since-days", type=int, default=7, help="Only include deals updated in last N days.")
-    run_parser.add_argument(
+    _add_common_discovery_arguments(run_parser)
+
+    execution_group = run_parser.add_argument_group("Assessment execution")
+    execution_group.add_argument(
         "--assistant",
         choices=["codex", "claude"],
         default="codex",
-        help="Assistant backend used for assessments (and smart intake classification).",
+        help="Assistant backend used for assessments and smart intake classification.",
     )
-    run_parser.add_argument(
-        "--layout",
-        choices=["syndicates", "flat"],
-        default="syndicates",
-        help=(
-            "Folder interpretation mode: syndicates=top-level folders are containers, "
-            "flat=top-level folders/files are deals."
-        ),
-    )
-    run_parser.add_argument(
+    execution_group.add_argument(
         "--skill-path",
         default="~/.codex/skills/angel-copilot/SKILL.md",
         help="Path to AngelCopilot SKILL.md used by native skill invocation.",
     )
-    run_parser.add_argument(
+    execution_group.add_argument(
         "--profile",
         default=".angelcopilot/profile.md",
-        help="Path to local investor profile markdown file.",
+        help="Path to your investor profile markdown file.",
     )
-    run_parser.add_argument("--out", default="outputs", help="Directory where run outputs will be written.")
-    run_parser.add_argument("--run-id", default="", help="Optional custom run folder name.")
-    run_parser.add_argument(
+    execution_group.add_argument(
         "--parallelism",
         type=int,
         default=1,
-        help="Number of deal assessments to run concurrently (start with 2-3).",
+        help="Number of deal assessments to run concurrently (2-3 is a practical start).",
     )
-    run_parser.add_argument(
-        "--intake-filter",
-        choices=["smart", "rules"],
-        default="smart",
-        help="Deal-folder filtering mode: smart=assistant classifier + fallback rules, rules=heuristics only.",
-    )
-    run_parser.add_argument(
+
+    output_group = run_parser.add_argument_group("Output control")
+    output_group.add_argument("--out", default="outputs", help="Directory where run outputs are written.")
+    output_group.add_argument("--run-id", default="", help="Optional custom run folder name.")
+
+    run_parser.set_defaults(pdf=True)
+    pdf_toggle = output_group.add_mutually_exclusive_group()
+    pdf_toggle.add_argument(
         "--pdf",
         dest="pdf",
         action="store_true",
-        default=True,
-        help="Generate PDF output (default: enabled; requires Playwright Chromium installed).",
+        default=argparse.SUPPRESS,
+        help="Generate PDF output (requires Playwright Chromium installed).",
     )
-    run_parser.add_argument(
+    pdf_toggle.add_argument(
         "--no-pdf",
         dest="pdf",
         action="store_false",
-        help="Disable PDF output.",
+        default=argparse.SUPPRESS,
+        help="Disable PDF output generation.",
     )
 
     validate_parser = batch_subparsers.add_parser(
         "validate",
         help="Validate intake folders",
         description="Preview which deals would be discovered before running assessments.",
+        formatter_class=_HelpFormatter,
+        epilog=dedent(
+            """
+            Examples:
+              uv run python -m angelcopilot_batch.cli batch validate \\
+                --deals-root /path/to/deals \\
+                --layout syndicates \\
+                --since-days 7 \\
+                --intake-filter smart
+
+              uv run python -m angelcopilot_batch.cli batch validate \\
+                --deals-root /path/to/deals \\
+                --layout flat \\
+                --since-days 30 \\
+                --intake-filter rules
+            """
+        ).strip(),
     )
-    validate_parser.add_argument(
-        "--deals-root",
-        required=True,
-        help=(
-            "Root folder containing deals. "
-            "Use parent-of-syndicates with --layout syndicates, or one-syndicate/deals folder with --layout flat."
-        ),
-    )
-    validate_parser.add_argument("--since-days", type=int, default=7, help="Only include deals updated in last N days.")
-    validate_parser.add_argument(
-        "--layout",
-        choices=["syndicates", "flat"],
-        default="syndicates",
-        help=(
-            "Folder interpretation mode: syndicates=top-level folders are containers, "
-            "flat=top-level folders/files are deals."
-        ),
-    )
-    validate_parser.add_argument(
-        "--intake-filter",
-        choices=["smart", "rules"],
-        default="smart",
-        help="Deal-folder filtering mode: smart=assistant classifier + fallback rules, rules=heuristics only.",
-    )
+    _add_common_discovery_arguments(validate_parser)
 
     report_parser = batch_subparsers.add_parser(
         "report",
         help="Rebuild reports from JSON",
         description="Regenerate report artifacts from an existing run's JSON without rerunning assessments.",
+        formatter_class=_HelpFormatter,
+        epilog=dedent(
+            """
+            Example:
+              uv run python -m angelcopilot_batch.cli batch report \\
+                --run-id run_20260329_101500 \\
+                --formats md,csv,json,pdf
+            """
+        ).strip(),
     )
-    report_parser.add_argument("--run-id", required=True, help="Source run id to load existing JSON from.")
-    report_parser.add_argument("--target-run-id", default="", help="Optional new run id for regenerated artifacts.")
-    report_parser.add_argument("--out", default="outputs", help="Base output directory where runs are stored.")
-    report_parser.add_argument("--formats", default="md,csv,json,pdf", help="Comma-separated output formats.")
-    report_parser.add_argument(
+    report_group = report_parser.add_argument_group("Report source and output")
+    report_group.add_argument("--run-id", required=True, help="Source run id to load existing JSON from.")
+    report_group.add_argument("--target-run-id", default="", help="Optional new run id for regenerated artifacts.")
+    report_group.add_argument("--out", default="outputs", help="Base output directory where runs are stored.")
+    report_group.add_argument("--formats", default="md,csv,json,pdf", help="Comma-separated output formats.")
+    report_group.add_argument(
         "--recompute-scoring",
         action="store_true",
         help="Reapply scoring using current profile settings before writing reports.",
     )
-    report_parser.add_argument(
+    report_group.add_argument(
         "--profile",
         default=".angelcopilot/profile.md",
         help="Profile used when --recompute-scoring is enabled.",
@@ -258,7 +380,52 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _add_common_discovery_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add shared discovery-related arguments used by run and validate commands.
+    
+    Args:
+        parser: Value for ``parser``.
+    
+    Returns:
+        None.
+    """
+
+    discovery_group = parser.add_argument_group("Deal discovery")
+    discovery_group.add_argument(
+        "--deals-root",
+        required=True,
+        help=DEALS_ROOT_HELP,
+    )
+    discovery_group.add_argument(
+        "--since-days",
+        type=int,
+        default=7,
+        help="Only include deals updated in the last N days.",
+    )
+    discovery_group.add_argument(
+        "--layout",
+        choices=["syndicates", "flat"],
+        default="syndicates",
+        help=LAYOUT_HELP,
+    )
+    discovery_group.add_argument(
+        "--intake-filter",
+        choices=["smart", "rules"],
+        default="smart",
+        help=INTAKE_FILTER_HELP,
+    )
+
+
 def _run_setup(args: argparse.Namespace) -> int:
+    """Install Playwright Chromium used by PDF rendering.
+    
+    Args:
+        args: Value for ``args``.
+    
+    Returns:
+        int: Value returned by this function.
+    """
+
     del args
     subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
     print("Chromium installed for Playwright PDF rendering.")
@@ -266,6 +433,15 @@ def _run_setup(args: argparse.Namespace) -> int:
 
 
 def _resolve_report_json_path(run_dir: Path) -> Path:
+    """Resolve report JSON path, supporting current and legacy filenames.
+    
+    Args:
+        run_dir: Value for ``run_dir``.
+    
+    Returns:
+        Path: Value returned by this function.
+    """
+
     preferred = run_dir / ASSESSMENTS_JSON_FILENAME
     if preferred.exists():
         return preferred
@@ -278,6 +454,15 @@ def _resolve_report_json_path(run_dir: Path) -> Path:
 
 
 def _infer_dilution_assumption(return_scenarios: list[dict[str, object]]) -> str:
+    """Infer dilution inclusion summary from report scenario payloads.
+    
+    Args:
+        return_scenarios: Value for ``return_scenarios``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
+
     observed: list[bool] = []
     for scenario in return_scenarios:
         candidate = scenario.get("includes_dilution")
@@ -297,6 +482,14 @@ def _infer_dilution_assumption(return_scenarios: list[dict[str, object]]) -> str
 
 
 def _parse_bool_or_none(value: object) -> bool | None:
+    """Parse bool or none.
+    
+    Args:
+        value: Value for ``value``.
+    
+    Returns:
+        bool | None: Value returned by this function.
+    """
     if isinstance(value, bool):
         return value
     if isinstance(value, str):

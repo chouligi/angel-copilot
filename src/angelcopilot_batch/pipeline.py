@@ -1,3 +1,5 @@
+"""Core batch orchestration from deal discovery to scored assessments."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -23,6 +25,8 @@ ProgressCallback = Callable[[str, dict[str, object]], None]
 
 @dataclass
 class PreparedDealTask:
+    """Prepared per-deal execution payload for worker processing."""
+
     deal: DealInput
     index: int
     total: int
@@ -45,6 +49,27 @@ def run_batch_assessment(
     progress_callback: ProgressCallback | None = None,
     parallelism: int = 1,
 ) -> list[AssessmentResult]:
+    """Run end-to-end batch assessment and return scored, sorted results.
+
+    Args:
+        deals_root: Root directory with discovered deal folders/files.
+        since_days: Intake lookback window in days.
+        profile: Investor profile used for fit and scoring.
+        runner: Assistant runner implementing ``run_assessment``.
+        cwd: Working directory for assistant commands.
+        profile_path: Profile file path passed to the skill prompt.
+        execution_mode: Execution mode selector (currently skill-native only).
+        runtime_skill_path: Path to runtime ``SKILL.md``.
+        top_level_containers: Whether top-level folders are containers.
+        intake_filter: Intake filtering mode.
+        folder_classifier: Optional intake classifier.
+        progress_callback: Optional progress event sink.
+        parallelism: Number of concurrent deal workers.
+
+    Returns:
+        Scored assessments sorted by descending weighted score.
+    """
+
     if execution_mode != EXECUTION_MODE_SKILL_NATIVE:
         raise ValueError(f"Unsupported execution mode: {execution_mode}")
     if parallelism < 1:
@@ -107,6 +132,20 @@ def _run_deal_assessments(
     progress_callback: ProgressCallback | None,
     parallelism: int,
 ) -> list[AssessmentResult]:
+    """Execute prepared deals sequentially or via thread pool workers.
+    
+    Args:
+        prepared_tasks: Value for ``prepared_tasks``.
+        profile: Value for ``profile``.
+        runner: Value for ``runner``.
+        cwd: Value for ``cwd``.
+        progress_callback: Value for ``progress_callback``.
+        parallelism: Value for ``parallelism``.
+    
+    Returns:
+        list[AssessmentResult]: Value returned by this function.
+    """
+
     assessments: list[AssessmentResult] = []
     if parallelism == 1 or len(prepared_tasks) <= 1:
         for prepared_task in prepared_tasks:
@@ -162,6 +201,18 @@ def _prepare_deal_tasks(
     runtime_skill_path: Path,
     progress_callback: ProgressCallback | None,
 ) -> list[PreparedDealTask]:
+    """Prepare isolated workspaces and prompts for each discovered deal.
+    
+    Args:
+        deals: Value for ``deals``.
+        profile_path: Value for ``profile_path``.
+        runtime_skill_path: Value for ``runtime_skill_path``.
+        progress_callback: Value for ``progress_callback``.
+    
+    Returns:
+        list[PreparedDealTask]: Value returned by this function.
+    """
+
     prepared_tasks: list[PreparedDealTask] = []
     total = len(deals)
     for index, deal in enumerate(deals, start=1):
@@ -231,6 +282,19 @@ def _assess_prepared_deal(
     cwd: Path,
     progress_callback: ProgressCallback | None,
 ) -> AssessmentResult | None:
+    """Execute one prepared deal assessment and return scored output.
+    
+    Args:
+        prepared_task: Value for ``prepared_task``.
+        profile: Value for ``profile``.
+        runner: Value for ``runner``.
+        cwd: Value for ``cwd``.
+        progress_callback: Value for ``progress_callback``.
+    
+    Returns:
+        AssessmentResult | None: Value returned by this function.
+    """
+
     deal = prepared_task.deal
     prepared_workspace = prepared_task.workspace
     try:
@@ -307,6 +371,19 @@ def _build_scored_assessment(
     evidence_sources: list[str],
     extraction_warnings: list[str],
 ) -> AssessmentResult:
+    """Construct normalized `AssessmentResult` and apply scoring rules.
+    
+    Args:
+        deal_id: Value for ``deal_id``.
+        normalized_payload: Value for ``normalized_payload``.
+        profile: Value for ``profile``.
+        evidence_sources: Value for ``evidence_sources``.
+        extraction_warnings: Value for ``extraction_warnings``.
+    
+    Returns:
+        AssessmentResult: Value returned by this function.
+    """
+
     return_scenarios = [
         dict(item) for item in list(normalized_payload.get("return_scenarios", [])) if isinstance(item, dict)
     ]
@@ -369,6 +446,18 @@ def build_skill_native_prompt(
     profile_path: Path,
     runtime_skill_path: Path = DEFAULT_RUNTIME_SKILL_PATH,
 ) -> str:
+    """Build the native skill invocation prompt with strict JSON schema contract.
+
+    Args:
+        deal_id: Stable deal identifier.
+        deal_path: Prepared deal docs path consumed by the skill.
+        profile_path: Investor profile path for personalization.
+        runtime_skill_path: Path to installed runtime ``SKILL.md``.
+
+    Returns:
+        Prompt text passed to the assistant CLI.
+    """
+
     response_schema = _response_schema_template()
     return (
         f"Deal ID: {deal_id}\n"
@@ -387,6 +476,15 @@ def build_skill_native_prompt(
 
 
 def _response_schema_template() -> str:
+    """Return the expected JSON schema example used in assistant prompts.
+    
+    Args:
+        None.
+    
+    Returns:
+        str: Value returned by this function.
+    """
+
     return (
         '{"deal_id":"...","company_name":"...","category_scores":{"Team":0,"Market":0,'
         '"Product":0,"Traction":0,"Unit Economics":0,"Defensibility":0,"Terms":0},'
@@ -414,12 +512,32 @@ def _response_schema_template() -> str:
 
 
 def build_default_run_id() -> str:
+    """Build a timestamped run id suitable for output folder names.
+    
+    Returns:
+        Run identifier in local timezone.
+    
+    Args:
+        None.
+    """
+
     local_now = datetime.now().astimezone()
     zone = (local_now.strftime("%Z") or "LOCAL").replace("/", "-").replace(" ", "_")
     return local_now.strftime(f"run_%Y_%B_%d_%H-%M-%S_{zone}")
 
 
 def _run_with_retry(runner, prompt: str, cwd: Path) -> tuple[dict[str, object] | None, str | None]:
+    """Run assistant once with a strict-JSON retry fallback on failure.
+    
+    Args:
+        runner: Value for ``runner``.
+        prompt: Value for ``prompt``.
+        cwd: Value for ``cwd``.
+    
+    Returns:
+        tuple[dict[str, object] | None, str | None]: Value returned by this function.
+    """
+
     first_error: str | None = None
     try:
         return runner.run_assessment(prompt, cwd=cwd), None
@@ -437,6 +555,15 @@ def _run_with_retry(runner, prompt: str, cwd: Path) -> tuple[dict[str, object] |
 
 
 def _build_all_yes_process() -> dict[str, object]:
+    """Default assessment-process metadata for normalized payloads.
+    
+    Args:
+        None.
+    
+    Returns:
+        dict[str, object]: Value returned by this function.
+    """
+
     return {
         "single_deal_equivalent": "yes",
         "used_full_rubric": True,
@@ -447,6 +574,15 @@ def _build_all_yes_process() -> dict[str, object]:
 
 
 def _infer_dilution_assumption(return_scenarios: list[dict[str, object]]) -> str:
+    """Infer dilution inclusion summary from return-scenario fields.
+    
+    Args:
+        return_scenarios: Value for ``return_scenarios``.
+    
+    Returns:
+        str: Value returned by this function.
+    """
+
     observed: list[bool] = []
     for scenario in return_scenarios:
         if "includes_dilution" in scenario:
@@ -474,12 +610,31 @@ def _emit_progress(
     event: str,
     payload: dict[str, object],
 ) -> None:
+    """Emit pipeline progress event when callback is configured.
+    
+    Args:
+        progress_callback: Value for ``progress_callback``.
+        event: Value for ``event``.
+        payload: Value for ``payload``.
+    
+    Returns:
+        None.
+    """
+
     if progress_callback is None:
         return
     progress_callback(event, payload)
 
 
 def _parse_bool_or_none(value: object) -> bool | None:
+    """Parse bool or none.
+    
+    Args:
+        value: Value for ``value``.
+    
+    Returns:
+        bool | None: Value returned by this function.
+    """
     if isinstance(value, bool):
         return value
     if isinstance(value, str):

@@ -1,3 +1,5 @@
+"""High-level batch job entrypoint with progress logging and output writing."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -21,6 +23,8 @@ LogFn = Callable[[str], None]
 
 @dataclass
 class BatchRunResult:
+    """Result object returned by `run_batch_job`."""
+
     run_id: str
     assessments: list[AssessmentResult]
     output_paths: BatchOutputPaths
@@ -42,6 +46,28 @@ def run_batch_job(
     logger: LogFn | None = None,
     runner=None,
 ) -> BatchRunResult:
+    """Run a full batch assessment job and write all configured artifacts.
+
+    Args:
+        deals_root: Root path containing deal folders/files.
+        since_days: Intake lookback window in days.
+        assistant: Assistant backend name (``codex`` or ``claude``).
+        profile_path: Path to investor profile markdown file.
+        out: Output directory for run artifacts.
+        skill_path: Runtime ``SKILL.md`` path used for skill-native prompts.
+        top_level_containers: Whether top-level folders are containers.
+        intake_filter: Intake mode (``smart`` or ``rules``).
+        include_pdf: Whether to generate PDF artifacts.
+        parallelism: Number of concurrent deal assessments.
+        run_id: Optional explicit run id; auto-generated when omitted.
+        cwd: Optional working directory for assistant command execution.
+        logger: Optional log sink.
+        runner: Optional injected assistant runner implementation.
+
+    Returns:
+        Batch run result containing run id, assessments, and output paths.
+    """
+
     resolved_deals_root = Path(deals_root).expanduser().resolve()
     resolved_profile_path = Path(profile_path).expanduser().resolve()
     resolved_output_dir = Path(out).expanduser().resolve()
@@ -98,7 +124,25 @@ def run_batch_job(
 
 
 def _build_progress_callback(logger: LogFn) -> Callable[[str, dict[str, object]], None]:
+    """Map internal progress events to user-facing log lines.
+    
+    Args:
+        logger: Value for ``logger``.
+    
+    Returns:
+        Callable[[str, dict[str, object]], None]: Value returned by this function.
+    """
+
     def _callback(event: str, payload: dict[str, object]) -> None:
+        """Callback.
+        
+        Args:
+            event: Value for ``event``.
+            payload: Value for ``payload``.
+        
+        Returns:
+            None.
+        """
         prefix = f"[{_timestamp()}]"
         if event == "batch_started":
             logger(
@@ -154,8 +198,26 @@ def _build_progress_callback(logger: LogFn) -> Callable[[str, dict[str, object]]
 
 
 def _timestamp() -> str:
+    """Return local wall-clock timestamp for log prefixes.
+    
+    Args:
+        None.
+    
+    Returns:
+        str: Value returned by this function.
+    """
+
     return datetime.now().astimezone().strftime("%H:%M:%S")
 
 
 def _default_logger(message: str) -> None:
+    """Default logger implementation used when no logger is injected.
+    
+    Args:
+        message: Value for ``message``.
+    
+    Returns:
+        None.
+    """
+
     print(message, flush=True)
