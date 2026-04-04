@@ -144,6 +144,7 @@ def _validate_batch(args: argparse.Namespace) -> int:
         since_days=args.since_days,
         top_level_containers=(args.layout == "syndicates"),
         intake_filter=args.intake_filter,
+        classifier_cache_path=Path.cwd() / ".angelcopilot" / "intake_classifier_cache.json",
     )
 
     print(f"Detected deals: {len(deals)}")

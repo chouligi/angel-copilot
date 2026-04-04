@@ -144,6 +144,23 @@ def _build_progress_callback(logger: LogFn) -> Callable[[str, dict[str, object]]
             None.
         """
         prefix = f"[{_timestamp()}]"
+        if event == "deal_discovery_started":
+            since_days = payload.get("since_days")
+            since_label = since_days if since_days is not None else "all"
+            layout = "syndicates" if payload.get("top_level_containers") else "flat"
+            logger(
+                f"{prefix} discovering deals: root={payload.get('deals_root')} "
+                f"layout={layout} since_days={since_label} intake={payload.get('intake_filter')}"
+            )
+            return
+        if event == "deal_discovery_completed":
+            since_days = payload.get("since_days")
+            since_label = since_days if since_days is not None else "all"
+            logger(
+                f"{prefix} discovery complete: deals={payload.get('total_deals', 0)} "
+                f"since_days={since_label}"
+            )
+            return
         if event == "batch_started":
             since_days = payload.get("since_days")
             since_label = since_days if since_days is not None else "all"

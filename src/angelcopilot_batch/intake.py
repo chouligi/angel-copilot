@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
+import json
 from pathlib import Path
 import re
 
@@ -39,6 +40,7 @@ INTAKE_FILTER_SMART = "smart"
 INTAKE_FILTER_RULES = "rules"
 
 FolderClassifier = Callable[[str, str | None], bool] | object
+ClassifierCache = dict[tuple[str, str | None], bool]
 
 
 def discover_recent_deals(
@@ -48,6 +50,7 @@ def discover_recent_deals(
     top_level_containers: bool = False,
     intake_filter: str = INTAKE_FILTER_SMART,
     folder_classifier: FolderClassifier | None = None,
+    classifier_cache_path: Path | None = None,
 ) -> list[DealInput]:
     """Discover deal candidates with recent supported-document activity.
 
@@ -58,6 +61,7 @@ def discover_recent_deals(
         top_level_containers: Whether top-level folders are grouping buckets (``syndicates`` layout mode).
         intake_filter: Intake filtering mode (``smart`` or ``rules``).
         folder_classifier: Optional classifier used by smart intake mode.
+        classifier_cache_path: Optional persistent JSON cache for smart folder classifications.
 
     Returns:
         Sorted deal inputs ordered by most recent modification time.
@@ -71,7 +75,7 @@ def discover_recent_deals(
     now_utc = now or datetime.now(timezone.utc)
     cutoff = now_utc - timedelta(days=since_days) if since_days is not None else None
     discovered: list[DealInput] = []
-    classifier_cache: dict[tuple[str, str | None], bool] = {}
+    classifier_cache = _load_classifier_cache(classifier_cache_path)
 
     candidates = _discover_deal_candidates(deals_root, top_level_containers=top_level_containers)
     for candidate in candidates:
@@ -101,16 +105,19 @@ def discover_recent_deals(
             )
         )
 
+    if classifier_cache_path is not None and intake_filter == INTAKE_FILTER_SMART:
+        _save_classifier_cache(classifier_cache_path, classifier_cache)
+
     return sorted(discovered, key=lambda item: item.latest_modified_at, reverse=True)
 
 
 def _discover_deal_candidates(root: Path, top_level_containers: bool) -> list[Path]:
     """Collect candidate deal paths from the root according to layout mode.
-    
+
     Args:
         root: Root path containing source/deal folders.
         top_level_containers: Whether top-level folders should be treated as container/group folders.
-    
+
     Returns:
         Candidate deal paths before smart/rules filtering.
     """
@@ -126,12 +133,12 @@ def _discover_deal_candidates(root: Path, top_level_containers: bool) -> list[Pa
 
 def _discover_deal_candidates_in(folder: Path, depth: int, top_level_containers: bool) -> list[Path]:
     """Recursively classify folder structure into deal candidates.
-    
+
     Args:
         folder: Folder path currently being inspected.
         depth: Current recursion depth below discovery root.
         top_level_containers: Whether depth-1 folders are treated as container/group folders.
-    
+
     Returns:
         Candidate deal folder/file paths discovered under ``folder``.
     """
@@ -182,10 +189,10 @@ def _discover_deal_candidates_in(folder: Path, depth: int, top_level_containers:
 
 def _collect_supported_files(folder: Path) -> list[Path]:
     """Collect supported files.
-    
+
     Args:
         folder: Folder path to scan recursively.
-    
+
     Returns:
         Sorted supported document file paths found under ``folder``.
     """
@@ -198,10 +205,10 @@ def _collect_supported_files(folder: Path) -> list[Path]:
 
 def _collect_supported_files_for_candidate(candidate: Path) -> list[Path]:
     """Collect supported files for candidate.
-    
+
     Args:
         candidate: Deal candidate path (file or folder).
-    
+
     Returns:
         Supported files associated with the candidate.
     """
@@ -214,10 +221,10 @@ def _collect_supported_files_for_candidate(candidate: Path) -> list[Path]:
 
 def _collect_supported_files_direct(folder: Path) -> list[Path]:
     """Collect supported files direct.
-    
+
     Args:
         folder: Folder path to inspect non-recursively.
-    
+
     Returns:
         Supported files directly under ``folder``.
     """
@@ -230,10 +237,10 @@ def _collect_supported_files_direct(folder: Path) -> list[Path]:
 
 def _collect_standalone_deal_files_direct(folder: Path) -> list[Path]:
     """Collect standalone deal files direct.
-    
+
     Args:
         folder: Folder path to inspect non-recursively.
-    
+
     Returns:
         Standalone deal file candidates directly under ``folder``.
     """
@@ -246,10 +253,10 @@ def _collect_standalone_deal_files_direct(folder: Path) -> list[Path]:
 
 def _has_supported_files_recursive(folder: Path) -> bool:
     """Has supported files recursive.
-    
+
     Args:
         folder: Folder path to scan recursively.
-    
+
     Returns:
         ``True`` if any supported document exists under ``folder``.
     """
@@ -258,13 +265,14 @@ def _has_supported_files_recursive(folder: Path) -> bool:
             return True
     return False
 
+
 def _latest_modified_timestamp(folder: Path, files: list[Path]) -> datetime:
     """Latest modified timestamp.
-    
+
     Args:
         folder: Candidate folder path.
         files: Supported document file paths associated with the candidate.
-    
+
     Returns:
         Latest modification timestamp across folder/files (UTC-aware).
     """
@@ -272,27 +280,81 @@ def _latest_modified_timestamp(folder: Path, files: list[Path]) -> datetime:
     return datetime.fromtimestamp(max(timestamps), tz=timezone.utc)
 
 
+def _load_classifier_cache(cache_path: Path | None) -> ClassifierCache:
+    """Load persistent classifier cache; return empty cache on any read/parse issue."""
+
+    if cache_path is None or not cache_path.exists():
+        return {}
+    try:
+        raw = json.loads(cache_path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return {}
+
+    entries = raw.get("entries") if isinstance(raw, dict) else None
+    if not isinstance(entries, dict):
+        return {}
+
+    cache: ClassifierCache = {}
+    for raw_key, decision in entries.items():
+        if not isinstance(raw_key, str) or not isinstance(decision, bool):
+            continue
+        cache_key = _parse_cache_key(raw_key)
+        cache[cache_key] = decision
+    return cache
+
+
+def _save_classifier_cache(cache_path: Path, cache: ClassifierCache) -> None:
+    """Persist classifier cache as JSON."""
+
+    entries: dict[str, bool] = {}
+    for (folder_name, parent_name), decision in cache.items():
+        entries[_build_cache_key(folder_name, parent_name)] = bool(decision)
+
+    payload = {
+        "version": 1,
+        "entries": entries,
+    }
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _build_cache_key(folder_name: str, parent_name: str | None) -> str:
+    """Serialize classifier cache key to deterministic string."""
+
+    parent = parent_name if parent_name is not None else ""
+    return f"{folder_name}\x1f{parent}"
+
+
+def _parse_cache_key(raw: str) -> tuple[str, str | None]:
+    """Parse serialized classifier cache key."""
+
+    if "\x1f" not in raw:
+        return raw, None
+    folder_name, parent_name = raw.split("\x1f", 1)
+    return folder_name, (parent_name or None)
+
+
 def _include_folder_candidate(
     candidate: Path,
     intake_filter: str,
     folder_classifier: FolderClassifier | None,
-    classifier_cache: dict[tuple[str, str | None], bool],
+    classifier_cache: ClassifierCache,
 ) -> bool:
     """Decide whether a folder candidate is likely a deal folder.
-    
+
     Args:
         candidate: Folder candidate path being evaluated.
         intake_filter: Intake mode (``smart`` or ``rules``).
         folder_classifier: Optional classifier callable/object used in smart mode.
         classifier_cache: In-memory cache keyed by ``(folder_name, parent_name)``.
-    
+
     Returns:
         ``True`` when candidate should be kept as a deal folder.
     """
 
     parent_name = candidate.parent.name if candidate.parent != candidate else None
     folder_name = candidate.name
-    cache_key = (folder_name.casefold(), parent_name.casefold() if parent_name else None)
+    cache_key = _classifier_cache_key(folder_name, parent_name)
     if cache_key in classifier_cache:
         return classifier_cache[cache_key]
 
@@ -314,12 +376,18 @@ def _include_folder_candidate(
     return decision
 
 
+def _classifier_cache_key(folder_name: str, parent_name: str | None) -> tuple[str, str | None]:
+    """Normalize cache key for case-insensitive folder-name matching."""
+
+    return folder_name.casefold(), (parent_name.casefold() if parent_name else None)
+
+
 def _is_excluded_deal_folder(folder_name: str) -> bool:
     """Is excluded deal folder.
-    
+
     Args:
         folder_name: Folder name to evaluate.
-    
+
     Returns:
         ``True`` when folder name matches an explicit exclusion list.
     """
@@ -329,10 +397,10 @@ def _is_excluded_deal_folder(folder_name: str) -> bool:
 
 def _is_likely_admin_folder(folder_name: str) -> bool:
     """Heuristic check for administrative/legal folder names.
-    
+
     Args:
         folder_name: Folder name to evaluate.
-    
+
     Returns:
         ``True`` when folder name looks administrative/non-deal.
     """
@@ -348,12 +416,12 @@ def _is_likely_admin_folder(folder_name: str) -> bool:
 
 def _run_folder_classifier(folder_classifier: FolderClassifier, folder_name: str, parent_name: str | None) -> bool:
     """Run classifier callable/object and normalize its boolean decision.
-    
+
     Args:
         folder_classifier: Classifier callable/object to invoke.
         folder_name: Folder name being classified.
         parent_name: Optional parent folder name for additional context.
-    
+
     Returns:
         Normalized boolean decision from classifier.
     """

@@ -75,12 +75,34 @@ def run_batch_assessment(
     if parallelism < 1:
         raise ValueError("parallelism must be >= 1")
 
+    _emit_progress(
+        progress_callback,
+        "deal_discovery_started",
+        {
+            "deals_root": str(deals_root),
+            "since_days": since_days,
+            "intake_filter": intake_filter,
+            "top_level_containers": top_level_containers,
+        },
+    )
     deals = discover_recent_deals(
         deals_root=deals_root,
         since_days=since_days,
         top_level_containers=top_level_containers,
         intake_filter=intake_filter,
         folder_classifier=folder_classifier,
+        classifier_cache_path=cwd / ".angelcopilot" / "intake_classifier_cache.json",
+    )
+    _emit_progress(
+        progress_callback,
+        "deal_discovery_completed",
+        {
+            "deals_root": str(deals_root),
+            "since_days": since_days,
+            "total_deals": len(deals),
+            "intake_filter": intake_filter,
+            "top_level_containers": top_level_containers,
+        },
     )
     resolved_profile_path = (
         profile_path.expanduser().resolve() if profile_path is not None else Path(".angelcopilot/profile.md").resolve()
