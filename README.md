@@ -75,6 +75,12 @@ See [`docs/assets/README.md`](docs/assets/README.md) for asset details.
 
 Use the synthetic sample and fixture data in this repository. No real company data is required.
 
+### Safe-first quick checklist
+
+- Verify your assistant privacy/data-control settings before uploading real documents.
+- Use synthetic, redacted, or anonymized documents first.
+- Confirm you have permission to process any real deal materials.
+
 ### A) Single-deal assessment memo (skill flow)
 
 1. Load Angel Copilot as a local skill in Codex or Claude Code.
@@ -386,6 +392,26 @@ Example location:
   [`docs/assets/batch_report_example_1.png`](docs/assets/batch_report_example_1.png),
   [`docs/assets/batch_report_example_2.png`](docs/assets/batch_report_example_2.png)
 
+## Data Handling, Privacy, and Legal Responsibility
+
+- You are solely responsible for documents you upload to any assistant.
+- Do not upload confidential, proprietary, personal, regulated, or NDA-restricted materials unless you have explicit authorization and acceptable safeguards.
+- Prefer synthetic, anonymized, or redacted documents.
+- Before uploading, review your assistant/provider account settings to disable model training/improvement and reduce retention/history where available.
+- Use organization/enterprise privacy controls when possible.
+- This project is educational decision support only and is not legal advice.
+
+Provider-agnostic references (settings and labels vary by plan and may change):
+- OpenAI Data Controls FAQ (for ChatGPT-style controls): https://help.openai.com/en/articles/7730893-data-controls-in-chatgpt
+- OpenAI policy on data use and opt-out paths: https://openai.com/policies/how-your-data-is-used-to-improve-model-performance/
+- Anthropic Claude Code data usage docs: https://code.claude.com/docs/en/data-usage
+- Anthropic Privacy Center: https://privacy.claude.com/en/
+
+## Repository layout
+
+For a quick map of where code, tests, docs, and skills live, see:
+
+- [`docs/repository_structure.md`](docs/repository_structure.md)
 
 ## Contributing
 

@@ -213,7 +213,9 @@ def test_run_batch_assessment__emits_progress_events(tmp_path: Path) -> None:
     )
 
     assert len(results) == 1
-    assert events[0] == "batch_started"
+    assert events[0] == "deal_discovery_started"
+    assert "deal_discovery_completed" in events
+    assert "batch_started" in events
     assert "deal_started" in events
     assert "deal_completed" in events
     assert events[-1] == "batch_completed"

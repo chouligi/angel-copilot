@@ -34,6 +34,17 @@ python3 -m pip install -e .
 uv run pytest -q
 ```
 
+Targeted suites:
+
+```bash
+uv run pytest -q tests/unit
+uv run pytest -q tests/integration
+```
+
+## Repository layout
+
+See [`docs/repository_structure.md`](docs/repository_structure.md) for the canonical folder structure.
+
 ## Docs and examples
 
 - Keep README claims aligned with actual CLI behavior.
