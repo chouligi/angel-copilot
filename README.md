@@ -1,47 +1,424 @@
 ![Angel Copilot logo](./logo_Dec_25_bigger.png)
 
-# Angel Copilot Skill for AI Agent Tools
+# Angel Copilot
 
-Angel Copilot is a skill for AI agent tools (e.g., Claude Code, Codex, etc.) that helps users build an investor profile, plan allocations, and assess startup deals using a structured rubric and web-sweep process.
+Angel Copilot is an open-source AI tool for angel investors. It helps you evaluate a single startup quickly or screen multiple deals at once and generate a ranked dealflow report.
 
-## Use in the Claude UI (upload)
+It supports two modes: Deal Assessment Memo and Dealflow Triage. Both can run with or without an investor profile, but we recommend creating your investor profile first for best results. Outputs are designed for decision support, with structured Markdown memos for single deals and comparative PDF reports for multi-deal prioritization.
 
-Upload the packaged `angel-copilot.skill` file from the repo root.
+## Why Angel Copilot
 
-## Use in Claude Code (local skill)
+Assessing startup deals is hard. Even experienced angel investors benefit from a structured thinking partner that can challenge assumptions, surface risks, and help turn messy materials into a clearer investment view.
 
-1) Clone this repo.
-2) In Claude Code, add a local skill and point it to:
+And when dealflow gets large, reviewing every company deeply can become a full-time job. Angel Copilot helps you move from ad-hoc assessment to focused triage, so you can spend more time on the deals most worth your attention.
 
+## Start here
+
+Pick the path that matches your goal:
+
+- Deal Assessment Memo (fastest): upload/import `angel-copilot.skill`, then run the single-deal prompt in "Try it on a sample deal in 5 minutes."
+- Dealflow Triage (advanced): complete "Dealflow Triage dependencies (local CLI)" in Installation, then run `batch validate` and `batch run` on your deal folders.
+- Recommended first step for either path: create your investor profile in "Recommended first step: create your investor profile."
+
+## Who this is for
+
+- Angel investors who want a repeatable way to evaluate startup opportunities.
+- Solo fund managers, scouts and angel syndicate leads screening many opportunities each week.
+- Founders and startup professionals transitioning into angel investing who want a disciplined memo process.
+
+## Core capabilities
+
+- Investor-profile-aware deal assessment using a structured 7-factor rubric.
+- Web-sweep + document reconciliation before scoring.
+- Return-scenario modeling with explicit dilution assumptions.
+- Batch intake, scoring, and comparative reporting across multiple deals.
+- Structured investment memos in Markdown format for single-deal review.
+- Comparative `csv` / `json` / `html` / `pdf` outputs for batch triage.
+
+## How to use Angel Copilot
+
+### 1) Deal Assessment Memo
+
+Best for evaluating one startup quickly.
+
+- Lowest-friction workflow.
+- Usually one deal at a time.
+- Works with or without a profile; best results come from profile-based personalization.
+- Produces a structured investment memo in Markdown format.
+- Good first workflow for new users and ad-hoc diligence.
+
+### 2) Dealflow Triage
+
+Best for screening multiple startups and deciding where to focus.
+
+- Advanced workflow for batch intake and comparative review.
+- Compares opportunities across the same run window.
+- Helps rank which deals deserve follow-up attention first.
+- Produces a polished comparative PDF report as the batch artifact.
+
+## Screenshots
+
+All screenshots below use synthetic sample content from this repo.
+
+### Deal Assessment Memo preview
+
+![Deal Assessment Memo screenshot](docs/assets/single_deal_md_example.png)
+
+### Dealflow Triage preview
+
+![Dealflow Triage overview screenshot](docs/assets/batch_report_example_1.png)
+![Dealflow Triage individual deals screenshot](docs/assets/batch_report_example_2.png)
+
+See [`docs/assets/README.md`](docs/assets/README.md) for asset details.
+
+## Try it on a sample deal in 5 minutes
+
+Use the synthetic sample and fixture data in this repository. No real company data is required.
+
+### Safe-first quick checklist
+
+- Verify your assistant privacy/data-control settings before uploading real documents.
+- Use synthetic, redacted, or anonymized documents first.
+- Confirm you have permission to process any real deal materials.
+
+### A) Single-deal assessment memo (skill flow)
+
+1. Load Angel Copilot as a local skill in Codex or Claude Code.
+2. After installing the local skill, ask Angel Copilot to assess the synthetic sample deal folder.
+3. Use this prompt and point to your installed `SKILL.md` and the synthetic sample folder:
+
+```text
+[$angel-copilot](<path-to-installed-skill-md>) assess the deal in <absolute-path-to-repo>/examples/sample-deal
 ```
+
+Example installed skill path (Codex local skill install):
+
+```text
+~/.codex/skills/angel-copilot/SKILL.md
+```
+
+Profile behavior in skill flow:
+- If `.angelcopilot/profile.md` exists, Angel Copilot auto-loads it at assessment start and confirms that it is using the profile.
+- If that file is missing, Angel Copilot runs a generic assessment and states that explicitly.
+
+Expected output:
+- A structured deal assessment memo in the chat response.
+- You can save a copy at `examples/sample-output/quick-deal-memo/` (see placeholder there).
+- The memo header is `Deal Assessment Memo`.
+
+### B) Dealflow triage (batch flow)
+
+This workflow validates a batch of startup folders, scores them consistently, and generates a comparative report with ranked attention priorities.
+
+How Dealflow Triage discovers deals:
+1. You point `--deals-root` to a local folder containing your startup/deal documents.
+2. The CLI interprets that folder using `--layout`:
+  - `syndicates`: top-level folders are source/group folders, and deal folders are inside them.
+  - `flat`: top-level folders/files are treated as deals directly.
+3. It scans for supported documents (`.txt`, `.md`, `.pdf`, `.docx`, `.zip`).
+4. It computes each deal's latest activity timestamp from supported files/folders.
+5. If you pass `--since-days`, it keeps only deals active in that lookback window; if omitted, it includes all detected deals.
+6. `batch validate` shows which deals were detected; `batch run` scores those detected deals.
+
+Directory examples for `--deals-root`:
+
+```text
+# --layout syndicates
+/deals-root/
+  SourceA/
+    startup-a/
+      deck.pdf
+      memo.md
+  PersonalCRM/
+    startup-b/
+      one-pager.docx
+```
+
+```text
+# --layout flat
+/deals-root/
+  startup-a/
+    deck.pdf
+  startup-b/
+    memo.md
+```
+
+Use synthetic fixtures first (demo):
+
+```bash
+uv run python -m angelcopilot_batch.cli batch validate \
+  --deals-root tests/fixtures/deals \
+  --layout flat \
+  --intake-filter rules
+```
+
+Then run a small comparative batch:
+
+```bash
+uv run python -m angelcopilot_batch.cli batch run \
+  --deals-root tests/fixtures/deals \
+  --layout flat \
+  --assistant codex \
+  --skill-path <path-to-installed-skill-md> \
+  --profile .angelcopilot/profile.md \
+  --out outputs \
+  --parallelism 2 \
+  --intake-filter rules
+```
+
+Example `--skill-path` value:
+
+```text
+~/.codex/skills/angel-copilot/SKILL.md
+```
+
+If `.angelcopilot/profile.md` does not exist yet, create it first (see "Recommended first step: create your investor profile" below).
+
+Expected output folder:
+- `outputs/run_<timestamp>/`
+- Includes `angelcopilot_batch_report.md`, `angelcopilot_batch_summary.csv`, `angelcopilot_batch_assessments.json`, `angelcopilot_batch_report.html`
+- The Markdown/HTML/PDF report header is `AngelCopilot Dealflow Triage Report`.
+- PDF generation is enabled by default; use `--no-pdf` to disable.
+
+If PDF is missing, run setup once:
+
+```bash
+uv run python -m angelcopilot_batch.cli setup
+```
+
+Run Dealflow Triage on your own deal folders:
+
+Tip: omit `--since-days` to include all deals in `--deals-root`.
+
+Layout quick guide:
+- `--layout syndicates`: top-level folders are group/source folders that contain deal folders (for example, `/deals-root/SourceA/startup-a/`).
+- `--layout flat`: top-level folders/files under `--deals-root` are deals directly (for example, `/deals-root/startup-a/`).
+
+```bash
+uv run python -m angelcopilot_batch.cli batch validate \
+  --deals-root /path/to/deals-root \
+  --layout syndicates \
+  --since-days 7 \
+  --intake-filter smart
+```
+
+```bash
+uv run python -m angelcopilot_batch.cli batch run \
+  --deals-root /path/to/deals-root \
+  --layout syndicates \
+  --since-days 7 \
+  --assistant codex \
+  --skill-path <path-to-installed-skill-md> \
+  --profile .angelcopilot/profile.md \
+  --out outputs \
+  --parallelism 2 \
+  --intake-filter smart
+```
+
+What this produces:
+- A timestamped run folder under `outputs/`.
+- A comparative markdown report and summary table (`csv`) for ranking deals.
+- A comparative PDF report artifact (unless you pass `--no-pdf`).
+
+## Recommended first step: create your investor profile
+
+You can run Angel Copilot without a profile, but results are typically better when profile context is available.
+Create your investor profile once so assessments can be tailored to your geography, currency, check size, risk tolerance, follow-on strategy, and portfolio context.
+
+In your assistant chat with the skill loaded:
+
+1. `Create or update my investor profile`
+2. `Start onboarding`
+3. `Save my profile`
+
+Then save the profile block to:
+
+```text
+.angelcopilot/profile.md
+```
+
+Optional local template:
+
+```bash
+mkdir -p .angelcopilot
+cp examples/profile.local.template.md .angelcopilot/profile.md
+```
+
+## Installation
+
+Choose the path that matches how you want to use Angel Copilot:
+
+- Deal Assessment Memo via skill upload/import: no local Python setup required.
+- Dealflow Triage via local CLI: install local dependencies and one assistant CLI (`codex` or `claude`).
+
+### Packaged `.skill`
+
+If you prefer a simple upload flow (no local code setup), use the packaged file:
+
+- `angel-copilot.skill` (in the repo root)
+- You can upload/import this file in skill-enabled UIs (for example, Claude UI skill upload, or other clients that support `.skill` import).
+
+If you are only using upload/import, you can stop here.
+
+If you are maintaining or editing the source skill files:
+
+- Source of truth is `skills/public/angel-copilot/`.
+- Rebuild the packaged file after skill edits:
+
+```bash
+./scripts/build_skill_package.sh
+```
+
+- Verify packaged file and source files are synced:
+
+```bash
+./scripts/verify_skill_package.sh
+```
+
+### Dealflow Triage dependencies (local CLI)
+
+Use this only if you want to run batch commands such as `batch validate` and `batch run`.
+
+1. Install Python dependencies (choose one path).
+
+Recommended:
+
+```bash
+uv sync
+```
+
+Fallback:
+
+```bash
+python3 -m pip install -r requirements.txt
+python3 -m pip install -e .
+```
+
+2. Ensure one assistant CLI is installed and available in your shell:
+
+```bash
+codex --version
+# or
+claude --version
+```
+
+3. Install PDF rendering dependency once (Playwright Chromium):
+
+```bash
+uv run python -m angelcopilot_batch.cli setup
+```
+
+### Claude Code local skill
+
+Use this only if you run Claude Code with a local filesystem skill path.
+If you already imported/uploaded `angel-copilot.skill`, you can skip this section.
+
+1. Clone this repo (or use your existing clone).
+2. In Claude Code, add this local skill folder path:
+
+```text
 skills/public/angel-copilot
 ```
 
-If your Claude Code setup expects skills to live in a specific directory, you can also copy the folder there.
+This mode is most useful if you are editing the skill and want your local changes to be used immediately.
 
-## Use in Codex (local skill)
+### Codex local skill
 
-Copy the skill folder to your Codex skills directory, typically:
+Use this only if you run Codex with a local filesystem skill path.
+If you already imported/uploaded `angel-copilot.skill`, you can skip this section.
 
-```
+Copy the skill folder into Codex local skills:
+
+```text
 ~/.codex/skills/angel-copilot
 ```
 
-## Use
+This mode is most useful if you are editing the skill and want local source changes to be used immediately.
 
-Example prompts:
-- Create or load my investor profile
-- Start onboarding
-- Suggest my investment allocation
-- Upload a startup's documents or information and ask "Assess a startup deal".
-- Generate a due diligence checklist
-- Explain what a SAFE is and how it differs from a convertible note
+### CLI runtime notes (for batch commands only)
 
-## Use the packaged .skill file
+This section explains how to run the local Python CLI (`angelcopilot_batch`) for Dealflow Triage.
+If you only use skill upload/import flows, you can skip this.
 
-This repo already includes `angel-copilot.skill`.
+- Recommended path: use `uv run` to execute commands without managing Python path details manually.
+- Alternative path: install the package in editable mode, then call the module directly:
+
+```bash
+python3 -m pip install -e .
+python3 -m angelcopilot_batch.cli --help
+```
+
+- Fallback path: if you run from source and see `ModuleNotFoundError`, set `PYTHONPATH` explicitly:
+
+```bash
+PYTHONPATH=src python3 -m angelcopilot_batch.cli --help
+```
+
+## Sample prompts
+
+- `Create or update my investor profile`
+- `Assess a startup deal`
+- `What are the main risks in this deal?`
+- `Compare these startup opportunities`
+- `Help me prioritize which of these deals deserve attention`
+- `Generate a due diligence checklist`
+
+## Sample output
+
+### Sample Deal Assessment Memo
+
+What to expect:
+- Narrative-first single-company memo.
+- Scorecard, return assumptions, return scenarios, reconciliation gaps, and founder questions.
+
+Example location:
+- [`examples/sample-output/quick-deal-memo/sample_quick_deal_memo.md`](examples/sample-output/quick-deal-memo/sample_quick_deal_memo.md)
+- Screenshot: [`docs/assets/single_deal_md_example.png`](docs/assets/single_deal_md_example.png)
+
+### Sample Dealflow Triage Report
+
+What to expect:
+- Multi-deal comparative ranking output.
+- Side-by-side scoring summary with attention prioritization.
+- Exportable PDF artifact for review/share.
+
+Example location:
+- [`examples/sample-output/dealflow-triage/README.md`](examples/sample-output/dealflow-triage/README.md)
+- Fictional batch input JSON:
+  [`examples/sample-output/dealflow-triage/fictional_batch_assessments.json`](examples/sample-output/dealflow-triage/fictional_batch_assessments.json)
+- Synthetic report artifact:
+  [`examples/sample-output/dealflow-triage/angelcopilot_batch_report.pdf`](examples/sample-output/dealflow-triage/angelcopilot_batch_report.pdf)
+- Screenshots:
+  [`docs/assets/batch_report_example_1.png`](docs/assets/batch_report_example_1.png),
+  [`docs/assets/batch_report_example_2.png`](docs/assets/batch_report_example_2.png)
+
+## Data Handling, Privacy, and Legal Responsibility
+
+- You are solely responsible for documents you upload to any assistant.
+- Do not upload confidential, proprietary, personal, regulated, or NDA-restricted materials unless you have explicit authorization and acceptable safeguards.
+- Prefer synthetic, anonymized, or redacted documents.
+- Before uploading, review your assistant/provider account settings to disable model training/improvement and reduce retention/history where available.
+- Use organization/enterprise privacy controls when possible.
+- This project is educational decision support only and is not legal advice.
+
+Provider-agnostic references (settings and labels vary by plan and may change):
+- OpenAI Data Controls FAQ (for ChatGPT-style controls): https://help.openai.com/en/articles/7730893-data-controls-in-chatgpt
+- OpenAI policy on data use and opt-out paths: https://openai.com/policies/how-your-data-is-used-to-improve-model-performance/
+- Anthropic Claude Code data usage docs: https://code.claude.com/docs/en/data-usage
+- Anthropic Privacy Center: https://privacy.claude.com/en/
+
+## Repository layout
+
+For a quick map of where code, tests, docs, and skills live, see:
+
+- [`docs/repository_structure.md`](docs/repository_structure.md)
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup, tests, style, and PR guidance.
+
 
 ## Further reading
 
-- How to use AngelCopilot: https://beyondthedemoai.substack.com/p/angelcopilot-a-copilot-for-angel
-- How AngelCopilot was built: https://www.linkedin.com/pulse/how-i-built-angelcopilot-turning-custom-gpt-system-chouliaras-eqwoe/?trackingId=DViRC4F3QcaGwJSxjGoZAA%3D%3D
+- [User guide](https://beyondthedemoai.substack.com/p/angelcopilot-a-copilot-for-angel)
+- [Build story and background](https://www.linkedin.com/pulse/how-i-built-angelcopilot-turning-custom-gpt-system-chouliaras-eqwoe/?trackingId=DViRC4F3QcaGwJSxjGoZAA%3D%3D)

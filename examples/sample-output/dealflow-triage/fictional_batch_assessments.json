@@ -1,0 +1,459 @@
+{
+  "summary": {
+    "total": 4,
+    "attention_count": 2
+  },
+  "assessments": [
+    {
+      "deal_id": "syntheticco_01_alphamesh",
+      "company_name": "SyntheticCo-01 AlphaMesh",
+      "category_scores": {
+        "Team": 4.6,
+        "Market": 4.2,
+        "Product": 4.0,
+        "Traction": 4.1,
+        "Unit Economics": 3.9,
+        "Defensibility": 3.7,
+        "Terms": 4.0
+      },
+      "risk_flags": [
+        "Enterprise sales cycles can lengthen close timing."
+      ],
+      "sectors": [
+        "AI",
+        "Infra SaaS"
+      ],
+      "geographies": [
+        "Europe",
+        "North America"
+      ],
+      "rationale": "Strong operations-focused thesis, credible early traction, and investable terms for a starter check.",
+      "citations": [
+        {
+          "id": "D1",
+          "source": "Deal one-pager",
+          "date": "2026-03-27",
+          "url": "https://syntheticco-01-alphamesh.example/data/one-pager",
+          "note": "Synthetic source."
+        }
+      ],
+      "category_rationales": {
+        "Team": "Domain-relevant operator profile.",
+        "Market": "Large, process-heavy segment with productivity pressure.",
+        "Product": "Workflow-native automation with clear user value.",
+        "Traction": "Encouraging cohort behavior and activation trend.",
+        "Unit Economics": "Healthy margin profile, but still early.",
+        "Defensibility": "Moat path through embedded context and integrations.",
+        "Terms": "Attractive cap for current quality of evidence."
+      },
+      "web_sweep_findings": [
+        {
+          "area": "Market",
+          "finding": "Growing spend on infrastructure workflow automation.",
+          "reconciliation": "Supports budget relevance."
+        }
+      ],
+      "web_sweep_sources": [
+        {
+          "id": "W1",
+          "title": "Category operations automation note",
+          "url": "https://infra-research.example/ops-automation-2026",
+          "date": "2026-03-20",
+          "why_relevant": "Synthetic market context."
+        }
+      ],
+      "milestones_to_monitor": [
+        "Recurring ARR activation ratio by quarter.",
+        "Net expansion in top customer cohorts."
+      ],
+      "key_unknowns": [
+        "Long-cycle retention durability beyond first 12 months."
+      ],
+      "return_scenarios": [
+        {
+          "scenario": "Pessimistic",
+          "multiple": "0.9x",
+          "probability": "45%",
+          "rationale": "Growth stabilizes below plan.",
+          "includes_dilution": true
+        },
+        {
+          "scenario": "Base",
+          "multiple": "5.5x",
+          "probability": "40%",
+          "rationale": "Repeatable expansion inside core segment.",
+          "includes_dilution": true
+        },
+        {
+          "scenario": "Optimistic",
+          "multiple": "16x",
+          "probability": "15%",
+          "rationale": "Strong category position with broad rollout.",
+          "includes_dilution": true
+        }
+      ],
+      "assessment_limitations": "Synthetic dataset for sample reporting.",
+      "assessment_process": {
+        "single_deal_equivalent": "yes",
+        "used_full_rubric": true,
+        "performed_web_sweep": true,
+        "reconciled_docs_with_web": true,
+        "built_three_case_return_model": true
+      },
+      "evidence_sources": [
+        "sample_deal/syntheticco_01_alphamesh_one_pager.md",
+        "sample_deal/syntheticco_01_alphamesh_terms.pdf"
+      ],
+      "extraction_warnings": [],
+      "hypothetical_investment": 2000.0,
+      "investment_currency": "EUR",
+      "investment_basis": "profile_ticket_typical",
+      "dilution_assumption": "Included.",
+      "verdict_one_liner": "Strong starter-check candidate at current entry terms.",
+      "why_not_invest_now": [],
+      "what_would_upgrade_to_invest": [],
+      "market_context": "Infrastructure operations budgets support measurable efficiency spend.",
+      "reconciliation_gaps": [
+        "Need clearer activation ARR split."
+      ],
+      "fit_call": "Fits high-risk, small-check strategy with disciplined reserve policy.",
+      "founder_questions": [
+        "What share of ARR is fully activated versus staged rollout?"
+      ],
+      "weighted_score": 4.12,
+      "verdict": "INVEST",
+      "attention_flag": true,
+      "attention_reason": "INVEST verdict and risk gates passed.",
+      "profile_fit": 0.95
+    },
+    {
+      "deal_id": "syntheticco_02_betadispatch",
+      "company_name": "SyntheticCo-02 BetaDispatch",
+      "category_scores": {
+        "Team": 4.3,
+        "Market": 4.0,
+        "Product": 3.8,
+        "Traction": 3.9,
+        "Unit Economics": 3.6,
+        "Defensibility": 3.4,
+        "Terms": 3.8
+      },
+      "risk_flags": [
+        "Revenue mix still includes onboarding-heavy components."
+      ],
+      "sectors": [
+        "AI",
+        "B2B SaaS"
+      ],
+      "geographies": [
+        "Europe"
+      ],
+      "rationale": "Compelling operational wedge, but metric definitions still require cleanup before higher conviction.",
+      "citations": [
+        {
+          "id": "D1",
+          "source": "Company memo",
+          "date": "2026-03-26",
+          "url": "https://syntheticco-02-betadispatch.example/data/memo",
+          "note": "Synthetic source."
+        }
+      ],
+      "category_rationales": {
+        "Team": "Strong founders with relevant execution background.",
+        "Market": "Budget line is real but competitive.",
+        "Product": "Practical workflow integration path.",
+        "Traction": "Encouraging early results, still definition-heavy.",
+        "Unit Economics": "Potentially good if services mix declines.",
+        "Defensibility": "Early signals, not yet proven moat compounding.",
+        "Terms": "Reasonable if revenue quality is validated."
+      },
+      "web_sweep_findings": [
+        {
+          "area": "Competition",
+          "finding": "Category intensity remains high.",
+          "reconciliation": "Supports a WAIT posture."
+        }
+      ],
+      "web_sweep_sources": [
+        {
+          "id": "W1",
+          "title": "Vertical operations software landscape",
+          "url": "https://marketwatch.example/vertical-ops-ai",
+          "date": "2026-03-19",
+          "why_relevant": "Synthetic competition context."
+        }
+      ],
+      "milestones_to_monitor": [
+        "Expansion in first 10 recurring logos.",
+        "Services-to-software revenue mix trend."
+      ],
+      "key_unknowns": [
+        "Retention trend after initial implementation cycle."
+      ],
+      "return_scenarios": [
+        {
+          "scenario": "Pessimistic",
+          "multiple": "0.7x",
+          "probability": "50%",
+          "rationale": "Expansion underperforms.",
+          "includes_dilution": true
+        },
+        {
+          "scenario": "Base",
+          "multiple": "4.5x",
+          "probability": "35%",
+          "rationale": "Consistent expansion with improving mix.",
+          "includes_dilution": true
+        },
+        {
+          "scenario": "Optimistic",
+          "multiple": "12x",
+          "probability": "15%",
+          "rationale": "Broad segment adoption.",
+          "includes_dilution": true
+        }
+      ],
+      "assessment_limitations": "Synthetic dataset for sample reporting.",
+      "assessment_process": {
+        "single_deal_equivalent": "yes",
+        "used_full_rubric": true,
+        "performed_web_sweep": true,
+        "reconciled_docs_with_web": true,
+        "built_three_case_return_model": true
+      },
+      "evidence_sources": [
+        "sample_deal/syntheticco_02_betadispatch_brief.md"
+      ],
+      "extraction_warnings": [],
+      "hypothetical_investment": 2000.0,
+      "investment_currency": "EUR",
+      "investment_basis": "profile_ticket_typical",
+      "dilution_assumption": "Included.",
+      "verdict_one_liner": "Worth continued diligence, but not conviction-ready.",
+      "why_not_invest_now": [
+        "Revenue composition still ambiguous.",
+        "Customer count definition needs normalization."
+      ],
+      "what_would_upgrade_to_invest": [
+        "Quarterly ARR bridge by product line.",
+        "Cohort expansion evidence across top accounts."
+      ],
+      "market_context": "Demand is real, but incumbents are shipping similar automation surfaces.",
+      "reconciliation_gaps": [
+        "ARR definitions need normalization.",
+        "Activation versus contracted metrics need clear split."
+      ],
+      "fit_call": "Possible starter-check candidate if metric clarity improves.",
+      "founder_questions": [
+        "How many paid recurring logos are fully activated today?"
+      ],
+      "weighted_score": 3.94,
+      "verdict": "WAIT",
+      "attention_flag": true,
+      "attention_reason": "WAIT with high score and strong profile fit.",
+      "profile_fit": 0.92
+    },
+    {
+      "deal_id": "syntheticco_03_gammautility",
+      "company_name": "SyntheticCo-03 GammaUtility",
+      "category_scores": {
+        "Team": 3.9,
+        "Market": 3.8,
+        "Product": 3.6,
+        "Traction": 3.5,
+        "Unit Economics": 3.3,
+        "Defensibility": 3.2,
+        "Terms": 3.4
+      },
+      "risk_flags": [
+        "Pilot conversion uncertainty."
+      ],
+      "sectors": [
+        "Energy SaaS"
+      ],
+      "geographies": [
+        "Europe"
+      ],
+      "rationale": "Interesting product direction but too much uncertainty in conversion quality and delivery mix.",
+      "citations": [],
+      "category_rationales": {
+        "Team": "Capable but still unproven at current scale.",
+        "Market": "Real demand, moderate competitive pressure.",
+        "Product": "Useful but not yet clearly differentiated.",
+        "Traction": "Pilot-heavy base with limited renewal history.",
+        "Unit Economics": "Insufficient durability evidence.",
+        "Defensibility": "Moat path still early.",
+        "Terms": "Fair but not compelling enough for current proof quality."
+      },
+      "web_sweep_findings": [],
+      "web_sweep_sources": [],
+      "milestones_to_monitor": [
+        "Pilot-to-annual conversion rate."
+      ],
+      "key_unknowns": [
+        "Expansion path within existing logos."
+      ],
+      "return_scenarios": [
+        {
+          "scenario": "Pessimistic",
+          "multiple": "0.5x",
+          "probability": "55%",
+          "rationale": "Low conversion from pilots.",
+          "includes_dilution": true
+        },
+        {
+          "scenario": "Base",
+          "multiple": "3.0x",
+          "probability": "35%",
+          "rationale": "Moderate commercialization success.",
+          "includes_dilution": true
+        },
+        {
+          "scenario": "Optimistic",
+          "multiple": "8.0x",
+          "probability": "10%",
+          "rationale": "Faster expansion than expected.",
+          "includes_dilution": true
+        }
+      ],
+      "assessment_limitations": "Synthetic dataset for sample reporting.",
+      "assessment_process": {
+        "single_deal_equivalent": "yes",
+        "used_full_rubric": true,
+        "performed_web_sweep": true,
+        "reconciled_docs_with_web": true,
+        "built_three_case_return_model": true
+      },
+      "evidence_sources": [
+        "sample_deal/syntheticco_03_gammautility_pitch.pdf"
+      ],
+      "extraction_warnings": [],
+      "hypothetical_investment": 2000.0,
+      "investment_currency": "EUR",
+      "investment_basis": "profile_ticket_typical",
+      "dilution_assumption": "Included.",
+      "verdict_one_liner": "Keep on watchlist until conversion quality improves.",
+      "why_not_invest_now": [
+        "Pilot-heavy traction with limited renewal visibility."
+      ],
+      "what_would_upgrade_to_invest": [
+        "Two quarters of improved conversion and retention."
+      ],
+      "market_context": "Moderate demand with several credible alternatives.",
+      "reconciliation_gaps": [
+        "Need tighter conversion and renewal data."
+      ],
+      "fit_call": "Low priority for immediate action.",
+      "founder_questions": [
+        "What is paid renewal rate by cohort?"
+      ],
+      "weighted_score": 3.57,
+      "verdict": "WAIT",
+      "attention_flag": false,
+      "attention_reason": "Deferred: below attention threshold.",
+      "profile_fit": 0.63
+    },
+    {
+      "deal_id": "syntheticco_04_deltaworkflow",
+      "company_name": "SyntheticCo-04 DeltaWorkflow",
+      "category_scores": {
+        "Team": 3.5,
+        "Market": 3.4,
+        "Product": 3.1,
+        "Traction": 2.9,
+        "Unit Economics": 2.8,
+        "Defensibility": 2.7,
+        "Terms": 3.0
+      },
+      "risk_flags": [
+        "Limited recurring signal at current stage.",
+        "Unclear differentiation versus incumbent workflows."
+      ],
+      "sectors": [
+        "Workflow SaaS"
+      ],
+      "geographies": [
+        "North America"
+      ],
+      "rationale": "Current signal quality is insufficient for near-term action; opportunity remains speculative.",
+      "citations": [],
+      "category_rationales": {
+        "Team": "Execution capability not yet demonstrated at scale.",
+        "Market": "Real but crowded budget line.",
+        "Product": "Feature set appears easy to replicate.",
+        "Traction": "Weak conversion and expansion evidence.",
+        "Unit Economics": "Insufficient margin and payback clarity.",
+        "Defensibility": "No strong moat indicators yet.",
+        "Terms": "Not discounted enough relative to uncertainty."
+      },
+      "web_sweep_findings": [],
+      "web_sweep_sources": [],
+      "milestones_to_monitor": [
+        "Customer retention in first annual cohort."
+      ],
+      "key_unknowns": [
+        "Whether product can sustain usage without high-touch support."
+      ],
+      "return_scenarios": [
+        {
+          "scenario": "Pessimistic",
+          "multiple": "0.2x",
+          "probability": "60%",
+          "rationale": "Commercial traction does not materialize.",
+          "includes_dilution": true
+        },
+        {
+          "scenario": "Base",
+          "multiple": "1.8x",
+          "probability": "30%",
+          "rationale": "Limited niche commercialization.",
+          "includes_dilution": true
+        },
+        {
+          "scenario": "Optimistic",
+          "multiple": "6.0x",
+          "probability": "10%",
+          "rationale": "Unexpected product adoption acceleration.",
+          "includes_dilution": true
+        }
+      ],
+      "assessment_limitations": "Synthetic dataset for sample reporting.",
+      "assessment_process": {
+        "single_deal_equivalent": "yes",
+        "used_full_rubric": true,
+        "performed_web_sweep": true,
+        "reconciled_docs_with_web": true,
+        "built_three_case_return_model": true
+      },
+      "evidence_sources": [
+        "sample_deal/syntheticco_04_deltaworkflow_brief.txt"
+      ],
+      "extraction_warnings": [],
+      "hypothetical_investment": 2000.0,
+      "investment_currency": "EUR",
+      "investment_basis": "profile_ticket_typical",
+      "dilution_assumption": "Included.",
+      "verdict_one_liner": "Do not prioritize at this stage.",
+      "why_not_invest_now": [
+        "Insufficient recurring traction proof.",
+        "Weak differentiation signal."
+      ],
+      "what_would_upgrade_to_invest": [
+        "Two strong expansion cohorts and improved economics."
+      ],
+      "market_context": "Competing with established workflow incumbents.",
+      "reconciliation_gaps": [
+        "Customer and revenue definitions are incomplete."
+      ],
+      "fit_call": "Outside current priority set.",
+      "founder_questions": [
+        "What is quarterly paid expansion trend?"
+      ],
+      "weighted_score": 3.05,
+      "verdict": "PASS",
+      "attention_flag": false,
+      "attention_reason": "PASS verdict.",
+      "profile_fit": 0.51
+    }
+  ]
+}

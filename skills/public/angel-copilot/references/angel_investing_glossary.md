@@ -46,5 +46,5 @@ Sources for Glossary
 - Brad Feld, Venture Deals (4th Ed.)
 - David S. Rose, Angel Investing
 - Y Combinator SAFE documentation
-- AngelList Glossary (https://angel.co/terms)
+- Public startup-investing glossary references
 - SeedInvest Investor Academy

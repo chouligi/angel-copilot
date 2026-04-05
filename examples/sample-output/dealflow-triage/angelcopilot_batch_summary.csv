@@ -1,0 +1,5 @@
+deal_id,company_name,weighted_score,verdict,attention_flag,attention_reason,risk_flags,sectors,geographies
+syntheticco_01_alphamesh,SyntheticCo-01 AlphaMesh,4.120,INVEST,True,INVEST verdict and risk gates passed.,Enterprise sales cycles can lengthen close timing.,AI; Infra SaaS,Europe; North America
+syntheticco_02_betadispatch,SyntheticCo-02 BetaDispatch,3.940,WAIT,True,WAIT with high score and strong profile fit.,Revenue mix still includes onboarding-heavy components.,AI; B2B SaaS,Europe
+syntheticco_03_gammautility,SyntheticCo-03 GammaUtility,3.570,WAIT,False,Deferred: below attention threshold.,Pilot conversion uncertainty.,Energy SaaS,Europe
+syntheticco_04_deltaworkflow,SyntheticCo-04 DeltaWorkflow,3.050,PASS,False,PASS verdict.,Limited recurring signal at current stage.; Unclear differentiation versus incumbent workflows.,Workflow SaaS,North America

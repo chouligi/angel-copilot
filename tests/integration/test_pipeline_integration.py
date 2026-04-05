@@ -1,0 +1,289 @@
+from __future__ import annotations
+
+from pathlib import Path
+import re
+import threading
+
+import pytest
+from angelcopilot_batch.models import InvestorProfile
+from angelcopilot_batch.pipeline import run_batch_assessment
+
+
+class FakeRunner:
+    def run_assessment(self, prompt: str, cwd: Path) -> dict[str, object]:
+        del prompt
+        del cwd
+        return {
+            "deal_id": "deal_a",
+            "company_name": "Deal A",
+            "category_scores": {
+                "Team": 4.4,
+                "Market": 4.2,
+                "Product": 4.0,
+                "Traction": 3.9,
+                "Unit Economics": 3.8,
+                "Defensibility": 4.1,
+                "Terms": 3.7,
+            },
+            "risk_flags": [],
+            "sectors": ["AI"],
+            "geographies": ["Europe"],
+            "rationale": "Good",
+            "citations": [
+                {"id": "D1", "source": "memo.txt", "date": "2026-01-01", "url": "provided://memo.txt", "note": "n"},
+                {"id": "W1", "source": "example", "date": "2026-01-02", "url": "https://example.com", "note": "n"},
+            ],
+            "category_rationales": {
+                "Team": "Strong execution background.",
+                "Market": "Large and growing market.",
+                "Product": "Differentiated workflow product.",
+                "Traction": "Early paid usage.",
+                "Unit Economics": "Initial pricing signal only.",
+                "Defensibility": "Execution speed and data loop.",
+                "Terms": "Reasonable compared to peers.",
+            },
+            "web_sweep_findings": ["Company site and major funding coverage align on thesis."],
+            "web_sweep_sources": ["https://example.com"],
+            "milestones_to_monitor": ["Reach 100 paying customers."],
+            "key_unknowns": ["Net dollar retention by segment."],
+            "return_scenarios": [
+                {"scenario": "Pessimistic", "multiple": "0.3x", "probability": "30%", "rationale": "No PMF"},
+                {"scenario": "Base", "multiple": "3x", "probability": "50%", "rationale": "Moderate exit"},
+                {"scenario": "Optimistic", "multiple": "12x", "probability": "20%", "rationale": "Strong scale"},
+            ],
+            "assessment_limitations": "Fixture data only.",
+            "assessment_process": {
+                "single_deal_equivalent": "yes",
+                "used_full_rubric": True,
+                "performed_web_sweep": True,
+                "reconciled_docs_with_web": True,
+                "built_three_case_return_model": True,
+                "notes": "Fixture confirms end-to-end path.",
+            },
+        }
+
+
+class CapturingRunner:
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+
+    def run_assessment(self, prompt: str, cwd: Path) -> dict[str, object]:
+        del cwd
+        self.prompts.append(prompt)
+        return FakeRunner().run_assessment(prompt="", cwd=Path("."))
+
+
+class FailingRunner:
+    def run_assessment(self, prompt: str, cwd: Path) -> dict[str, object]:
+        del prompt
+        del cwd
+        raise RuntimeError("intentional failure")
+
+
+class ThreadTrackingRunner:
+    def __init__(self) -> None:
+        self.thread_ids: set[int] = set()
+        self.lock = threading.Lock()
+
+    def run_assessment(self, prompt: str, cwd: Path) -> dict[str, object]:
+        del cwd
+        deal_id_match = re.search(r"Deal ID: ([^\n]+)", prompt)
+        deal_id = deal_id_match.group(1).strip() if deal_id_match else "unknown"
+        with self.lock:
+            self.thread_ids.add(threading.get_ident())
+        return {
+            "deal_id": deal_id,
+            "company_name": deal_id.replace("_", " ").title(),
+            "category_scores": {
+                "Team": 4.1,
+                "Market": 4.1,
+                "Product": 4.1,
+                "Traction": 4.1,
+                "Unit Economics": 4.1,
+                "Defensibility": 4.1,
+                "Terms": 4.1,
+            },
+            "risk_flags": [],
+            "sectors": ["AI"],
+            "geographies": ["Europe"],
+            "rationale": "Good",
+            "citations": [],
+            "category_rationales": {
+                "Team": "Strong team.",
+                "Market": "Large market.",
+                "Product": "Useful product.",
+                "Traction": "Early traction.",
+                "Unit Economics": "Plausible economics.",
+                "Defensibility": "Some moat.",
+                "Terms": "Neutral terms.",
+            },
+            "web_sweep_findings": ["Finding"],
+            "web_sweep_sources": ["https://example.com"],
+            "milestones_to_monitor": ["Milestone"],
+            "key_unknowns": ["Unknown"],
+            "return_scenarios": [
+                {"scenario": "Pessimistic", "multiple": "0.3x", "probability": "30%", "rationale": "Low"},
+                {"scenario": "Base", "multiple": "3x", "probability": "50%", "rationale": "Medium"},
+                {"scenario": "Optimistic", "multiple": "12x", "probability": "20%", "rationale": "High"},
+            ],
+            "assessment_limitations": "Fixture data only.",
+            "assessment_process": {
+                "single_deal_equivalent": "yes",
+                "used_full_rubric": True,
+                "performed_web_sweep": True,
+                "reconciled_docs_with_web": True,
+                "built_three_case_return_model": True,
+            },
+        }
+
+
+def test_run_batch_assessment__processes_recent_deals_end_to_end(tmp_path: Path) -> None:
+    deals_root = tmp_path / "deals"
+    deal_folder = deals_root / "deal_a"
+    deal_folder.mkdir(parents=True)
+    (deal_folder / "memo.txt").write_text("AI startup with traction", encoding="utf-8")
+
+    profile = InvestorProfile(sectors_themes=["AI"], geo_focus=["Europe"])
+    results = run_batch_assessment(
+        deals_root=deals_root,
+        since_days=7,
+        profile=profile,
+        runner=FakeRunner(),
+        cwd=tmp_path,
+    )
+
+    assert len(results) == 1
+    assert results[0].deal_id == "deal_a"
+    assert results[0].weighted_score > 0
+
+
+def test_run_batch_assessment__skill_native_mode_uses_skill_reference(tmp_path: Path) -> None:
+    deals_root = tmp_path / "deals"
+    deal_folder = deals_root / "deal_a"
+    deal_folder.mkdir(parents=True)
+    (deal_folder / "memo.txt").write_text("AI startup with traction", encoding="utf-8")
+    profile_path = tmp_path / "profile.md"
+    profile_path.write_text("region: EU\ncurrency: EUR\n", encoding="utf-8")
+    runtime_skill_path = tmp_path / "SKILL.md"
+    runtime_skill_path.write_text("placeholder skill", encoding="utf-8")
+
+    profile = InvestorProfile(sectors_themes=["AI"], geo_focus=["Europe"])
+    runner = CapturingRunner()
+
+    results = run_batch_assessment(
+        deals_root=deals_root,
+        since_days=7,
+        profile=profile,
+        runner=runner,
+        cwd=tmp_path,
+        profile_path=profile_path,
+        runtime_skill_path=runtime_skill_path,
+    )
+
+    assert len(results) == 1
+    assert runner.prompts
+    prompt = runner.prompts[0]
+    assert "[$angel-copilot](" in prompt
+    assert str(runtime_skill_path) in prompt
+    assert "assess the deal in " in prompt
+    assert str(deal_folder) not in prompt
+    assert str(profile_path) in prompt
+
+
+def test_run_batch_assessment__emits_progress_events(tmp_path: Path) -> None:
+    deals_root = tmp_path / "deals"
+    deal_folder = deals_root / "deal_a"
+    deal_folder.mkdir(parents=True)
+    (deal_folder / "memo.txt").write_text("AI startup with traction", encoding="utf-8")
+
+    profile = InvestorProfile(sectors_themes=["AI"], geo_focus=["Europe"])
+    events: list[str] = []
+
+    def progress(event: str, payload: dict[str, object]) -> None:
+        del payload
+        events.append(event)
+
+    results = run_batch_assessment(
+        deals_root=deals_root,
+        since_days=7,
+        profile=profile,
+        runner=FakeRunner(),
+        cwd=tmp_path,
+        progress_callback=progress,
+    )
+
+    assert len(results) == 1
+    assert events[0] == "deal_discovery_started"
+    assert "deal_discovery_completed" in events
+    assert "batch_started" in events
+    assert "deal_started" in events
+    assert "deal_completed" in events
+    assert events[-1] == "batch_completed"
+
+
+def test_run_batch_assessment__emits_deal_failed_when_runner_errors(tmp_path: Path) -> None:
+    deals_root = tmp_path / "deals"
+    deal_folder = deals_root / "deal_a"
+    deal_folder.mkdir(parents=True)
+    (deal_folder / "memo.txt").write_text("AI startup with traction", encoding="utf-8")
+
+    profile = InvestorProfile(sectors_themes=["AI"], geo_focus=["Europe"])
+    events: list[tuple[str, dict[str, object]]] = []
+
+    def progress(event: str, payload: dict[str, object]) -> None:
+        events.append((event, payload))
+
+    results = run_batch_assessment(
+        deals_root=deals_root,
+        since_days=7,
+        profile=profile,
+        runner=FailingRunner(),
+        cwd=tmp_path,
+        progress_callback=progress,
+    )
+
+    assert results == []
+    failed_events = [payload for event, payload in events if event == "deal_failed"]
+    assert len(failed_events) == 1
+    assert failed_events[0]["reason"] == "assistant_failed"
+
+
+def test_run_batch_assessment__parallelism_runs_deals_on_multiple_threads(tmp_path: Path) -> None:
+    deals_root = tmp_path / "deals"
+    for deal_id in ("deal_a", "deal_b"):
+        deal_folder = deals_root / deal_id
+        deal_folder.mkdir(parents=True)
+        (deal_folder / "memo.txt").write_text("AI startup with traction", encoding="utf-8")
+
+    profile = InvestorProfile(sectors_themes=["AI"], geo_focus=["Europe"])
+    runner = ThreadTrackingRunner()
+
+    results = run_batch_assessment(
+        deals_root=deals_root,
+        since_days=7,
+        profile=profile,
+        runner=runner,
+        cwd=tmp_path,
+        parallelism=2,
+    )
+
+    assert len(results) == 2
+    assert len(runner.thread_ids) >= 2
+
+
+def test_run_batch_assessment__parallelism_less_than_one_raises(tmp_path: Path) -> None:
+    deals_root = tmp_path / "deals"
+    deal_folder = deals_root / "deal_a"
+    deal_folder.mkdir(parents=True)
+    (deal_folder / "memo.txt").write_text("AI startup with traction", encoding="utf-8")
+
+    profile = InvestorProfile(sectors_themes=["AI"], geo_focus=["Europe"])
+    with pytest.raises(ValueError, match="parallelism must be >= 1"):
+        run_batch_assessment(
+            deals_root=deals_root,
+            since_days=7,
+            profile=profile,
+            runner=FakeRunner(),
+            cwd=tmp_path,
+            parallelism=0,
+        )
