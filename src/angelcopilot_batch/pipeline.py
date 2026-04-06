@@ -116,6 +116,7 @@ def run_batch_assessment(
             "since_days": since_days,
             "total_deals": len(deals),
             "execution_mode": execution_mode,
+            "parallelism": parallelism,
         },
     )
 

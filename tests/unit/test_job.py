@@ -82,6 +82,33 @@ def test_run_batch_job__logs_progress_and_writes_outputs(tmp_path: Path) -> None
 
     assert len(result.assessments) == 1
     assert result.output_paths.markdown_path.exists()
-    assert any("preparing deal" in msg for msg in messages)
+    assert not any("preparing deal" in msg for msg in messages)
+    assert any("prepared deal" in msg for msg in messages)
     assert any("assessment started for 'deal_a'" in msg for msg in messages)
     assert any("done 'deal_a'" in msg for msg in messages)
+    assert any("Assessing deals sequentially (parallelism=1)." in msg for msg in messages)
+
+
+def test_run_batch_job__logs_parallelism_when_above_one(tmp_path: Path) -> None:
+    deals_root = tmp_path / "deals"
+    deal_folder = deals_root / "deal_a"
+    deal_folder.mkdir(parents=True)
+    (deal_folder / "memo.txt").write_text("AI startup with traction", encoding="utf-8")
+    profile_path = tmp_path / "profile.md"
+    profile_path.write_text("region: EU\ncurrency: EUR\n", encoding="utf-8")
+
+    messages: list[str] = []
+    run_batch_job(
+        deals_root=deals_root,
+        since_days=7,
+        assistant="codex",
+        profile_path=profile_path,
+        out=tmp_path / "outputs",
+        top_level_containers=False,
+        include_pdf=False,
+        runner=FakeRunner(),
+        logger=messages.append,
+        parallelism=4,
+    )
+
+    assert any("Assessing 4 deals in parallel." in msg for msg in messages)
