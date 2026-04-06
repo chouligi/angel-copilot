@@ -488,6 +488,7 @@ def _render_html(assessments: list[AssessmentResult], run_id: str) -> str:
     return (
         "<!doctype html><html><head><meta charset='utf-8'>"
         "<style>"
+        "*{box-sizing:border-box;}"
         "body{font-family:Helvetica,Arial,sans-serif;margin:0;color:#1f2937;background:#ffffff;}"
         ".page{padding:24px 28px;}"
         ".cover{background:linear-gradient(135deg,#f9fafb 0%,#e7eef7 100%);"
@@ -504,9 +505,12 @@ def _render_html(assessments: list[AssessmentResult], run_id: str) -> str:
         ".card{background:#fff;border:1px solid #d1d5db;border-radius:8px;padding:10px;}"
         ".card-label{font-size:11px;text-transform:uppercase;color:#6b7280;margin-bottom:4px;}"
         ".card-value{font-size:20px;font-weight:700;color:#111827;}"
-        "table{width:100%;border-collapse:collapse;background:#fff;}"
-        "th,td{border:1px solid #d1d5db;padding:8px;text-align:left;font-size:12px;vertical-align:top;}"
+        "table{width:100%;max-width:100%;table-layout:fixed;border-collapse:collapse;background:#fff;}"
+        "th,td{border:1px solid #d1d5db;padding:8px;text-align:left;font-size:12px;vertical-align:top;"
+        "overflow-wrap:anywhere;word-break:break-word;}"
         "th{background:#111827;color:#fff;}"
+        "code{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;}"
+        ".web-sources-table td.url-cell code{display:block;}"
         "tr.attention-row td{background:#edf8ef;}"
         ".pill{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;}"
         ".pill-invest{background:#dcfce7;color:#166534;}"
@@ -1281,13 +1285,13 @@ def _render_web_sources_table_html(sources: list[dict[str, object] | str]) -> st
         for column in columns:
             value = row.get(column, "-")
             if column == "URL":
-                cells.append(f"<td><code>{escape(value)}</code></td>")
+                cells.append(f"<td class='url-cell'><code>{escape(value)}</code></td>")
             else:
                 cells.append(f"<td>{escape(value)}</td>")
         body_parts.append("<tr>" + "".join(cells) + "</tr>")
 
     return (
-        "<table><thead><tr>"
+        "<table class='web-sources-table'><thead><tr>"
         f"{header_html}"
         "</tr></thead><tbody>"
         f"{''.join(body_parts)}"

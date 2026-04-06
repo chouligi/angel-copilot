@@ -16,3 +16,5 @@ dist/
 htmlcov/
 .local/
 .run_batch_assessment.sh
+.run_batch_assessment_demo.sh
+demo-deals/

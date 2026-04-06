@@ -115,3 +115,49 @@ def test_write_batch_outputs__omits_why_not_for_invest_verdict(tmp_path: Path) -
     assert "What would upgrade to INVEST:" not in markdown_text
     assert "Why not INVEST now:" not in html_text
     assert "What would upgrade to INVEST:" not in html_text
+
+
+def test_write_batch_outputs__web_source_url_cells_are_wrap_safe(tmp_path: Path) -> None:
+    assessments = [
+        AssessmentResult(
+            deal_id="d3",
+            company_name="Gamma",
+            category_scores={
+                "Team": 4.0,
+                "Market": 3.9,
+                "Product": 4.1,
+                "Traction": 3.8,
+                "Unit Economics": 3.7,
+                "Defensibility": 3.6,
+                "Terms": 3.5,
+            },
+            risk_flags=[],
+            sectors=["Infra SaaS"],
+            geographies=["EU"],
+            rationale="Reasonable",
+            weighted_score=3.9,
+            verdict="WAIT",
+            attention_flag=False,
+            attention_reason="Below threshold",
+            web_sweep_sources=[
+                {
+                    "id": "W1",
+                    "source": "Very Long Source Name",
+                    "url": "https://example.com/this/is/a/very/long/url/that/should/not/overflow/in/pdf/"
+                    "rendering/even/when/it/contains/long/unbroken/segments/and/query"
+                    "?token=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "date": "2026-04-06",
+                    "why_relevant": "Formatting stress test for wrap behavior.",
+                }
+            ],
+        )
+    ]
+
+    output_paths = write_batch_outputs(assessments=assessments, output_dir=tmp_path, run_id="run-3")
+    html_text = output_paths.html_path.read_text(encoding="utf-8")
+
+    assert "class='web-sources-table'" in html_text
+    assert "class='url-cell'" in html_text
+    assert ".web-sources-table td.url-cell code{display:block;}" in html_text
+    assert "overflow-wrap:anywhere" in html_text
+    assert "table-layout:fixed" in html_text
