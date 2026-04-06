@@ -164,16 +164,18 @@ def _build_progress_callback(logger: LogFn) -> Callable[[str, dict[str, object]]
         if event == "batch_started":
             since_days = payload.get("since_days")
             since_label = since_days if since_days is not None else "all"
+            parallelism = int(payload.get("parallelism", 1) or 1)
             logger(
                 f"{prefix} batch started: deals={payload.get('total_deals', 0)} "
                 f"since_days={since_label} mode={payload.get('execution_mode')}"
             )
+            if parallelism > 1:
+                logger(f"{prefix} Assessing {parallelism} deals in parallel.")
+            else:
+                logger(f"{prefix} Assessing deals sequentially (parallelism=1).")
             return
         if event == "deal_started":
-            logger(
-                f"{prefix} [{payload.get('index')}/{payload.get('total')}] "
-                f"preparing deal '{payload.get('deal_id')}' (files={payload.get('supported_files')})"
-            )
+            del payload
             return
         if event == "deal_prepared":
             logger(
