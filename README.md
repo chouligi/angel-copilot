@@ -18,6 +18,7 @@ Pick the path that matches your goal:
 
 - Deal Assessment Memo (fastest): upload/import `angel-copilot.skill`, then run the single-deal prompt in "Try it on a sample deal in 5 minutes."
 - Dealflow Triage (advanced): complete "Dealflow Triage dependencies (local CLI)" in Installation, then run `batch validate` and `batch run` on your deal folders.
+- No-setup option: use [AngelCopilot GPT](https://chatgpt.com/g/g-69011b259dd88191860f2327c0cf19c7-angelcopilot)
 - Recommended first step for either path: create your investor profile in "Recommended first step: create your investor profile."
 
 ## Who this is for
@@ -69,17 +70,13 @@ All screenshots below use synthetic sample content from this repo.
 ![Dealflow Triage overview screenshot](docs/assets/batch_report_example_1.png)
 ![Dealflow Triage individual deals screenshot](docs/assets/batch_report_example_2.png)
 
-See [`docs/assets/README.md`](docs/assets/README.md) for asset details.
+### Dealflow Triage demo
+
+[![Watch Dealflow Triage demo](docs/assets/dealflow_triage_demo_front_cover_play.png)](https://www.youtube.com/watch?v=52c_M8IptqI)
 
 ## Try it on a sample deal in 5 minutes
 
 Use the synthetic sample and fixture data in this repository. No real company data is required.
-
-### Safe-first quick checklist
-
-- Verify your assistant privacy/data-control settings before uploading real documents.
-- Use synthetic, redacted, or anonymized documents first.
-- Confirm you have permission to process any real deal materials.
 
 ### A) Single-deal assessment memo (skill flow)
 

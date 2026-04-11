@@ -10,6 +10,12 @@ This folder stores launch visuals used by the root README and release pages.
   - Screenshot of comparative batch report overview (ranked summary).
 - `batch_report_example_2.png`
   - Screenshot of individual-deal section in the batch report.
+- `dealflow_triage_demo_front_cover.png`
+  - Source front cover image for Dealflow Triage demo.
+- `youtube_play_button.png`
+  - Source YouTube play button asset used on the demo thumbnail.
+- `dealflow_triage_demo_front_cover_play.png`
+  - Clickable README thumbnail with centered play-button overlay.
 
 ## Guidelines
 
