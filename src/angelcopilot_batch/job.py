@@ -148,8 +148,9 @@ def _build_progress_callback(logger: LogFn) -> Callable[[str, dict[str, object]]
             since_days = payload.get("since_days")
             since_label = since_days if since_days is not None else "all"
             layout = "syndicates" if payload.get("top_level_containers") else "flat"
+            deals_root_display = _display_path(payload.get("deals_root"))
             logger(
-                f"{prefix} discovering deals: root={payload.get('deals_root')} "
+                f"{prefix} discovering deals: root={deals_root_display} "
                 f"layout={layout} since_days={since_label} intake={payload.get('intake_filter')}"
             )
             return
@@ -242,3 +243,27 @@ def _default_logger(message: str) -> None:
     """
 
     print(message, flush=True)
+
+
+def _display_path(raw_path: object) -> str:
+    """Return a sanitized path for logs, preferring cwd-relative form.
+
+    Args:
+        raw_path: Candidate path-like payload field.
+
+    Returns:
+        A user-friendly path string for log output.
+    """
+
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        return "-"
+
+    path = Path(raw_path).expanduser()
+    if not path.is_absolute():
+        return str(path)
+
+    cwd = Path.cwd().resolve()
+    try:
+        return str(path.resolve().relative_to(cwd))
+    except Exception:  # noqa: BLE001
+        return str(path)
