@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 import re
 
-from angelcopilot_batch.models import AssessmentResult, InvestorProfile
+from angelcopilot.models import AssessmentResult, InvestorProfile
 
 CATEGORY_WEIGHTS = {
     "Team": 0.25,

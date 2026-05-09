@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from angelcopilot_batch.models import AssessmentResult, InvestorProfile
-from angelcopilot_batch.scoring import apply_scoring_rules
+from angelcopilot.models import AssessmentResult, InvestorProfile
+from angelcopilot.scoring import apply_scoring_rules
 
 
 def test_apply_scoring_rules__marks_invest_when_weighted_score_is_high() -> None:

@@ -8,7 +8,7 @@ import shutil
 import tempfile
 import zipfile
 
-from angelcopilot_batch.intake import SUPPORTED_DOC_EXTENSIONS
+from angelcopilot.intake import SUPPORTED_DOC_EXTENSIONS
 
 DIRECT_DOC_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
 MAX_ZIP_RECURSION_DEPTH = 6

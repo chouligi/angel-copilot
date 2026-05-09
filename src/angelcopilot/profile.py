@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 import re
 
-from angelcopilot_batch.models import InvestorProfile
+from angelcopilot.models import InvestorProfile
 
 KEY_ALIASES = {
     "themes": "sectors_themes",

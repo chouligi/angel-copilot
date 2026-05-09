@@ -101,13 +101,13 @@ claude --version
 3. Install the PDF rendering dependency once:
 
 ```bash
-uv run python -m angelcopilot_batch.cli setup
+uv run python -m angelcopilot.cli setup
 ```
 
 ### Validate the synthetic fixtures
 
 ```bash
-uv run python -m angelcopilot_batch.cli batch validate \
+uv run python -m angelcopilot.cli batch validate \
   --deals-root tests/fixtures/deals \
   --layout flat \
   --intake-filter rules
@@ -116,10 +116,11 @@ uv run python -m angelcopilot_batch.cli batch validate \
 ### Run a sample comparative batch
 
 ```bash
-uv run python -m angelcopilot_batch.cli batch run \
+uv run python -m angelcopilot.cli batch run \
   --deals-root tests/fixtures/deals \
   --layout flat \
   --assistant codex \
+  --assistant-model gpt-5.5 \
   --skill-path <path-to-installed-skill-md> \
   --profile .angelcopilot/profile.md \
   --out outputs \
@@ -141,6 +142,7 @@ Expected output folder:
 - Includes `angelcopilot_batch_report.md`, `angelcopilot_batch_summary.csv`, `angelcopilot_batch_assessments.json`, `angelcopilot_batch_report.html`
 - The report header is `AngelCopilot Dealflow Triage Report`
 - PDF generation is enabled by default; use `--no-pdf` to disable
+- `--assistant-model` is optional. Omit it to use the model configured in `~/.codex/config.toml`.
 
 ### Run on your own deal folders
 
@@ -152,7 +154,7 @@ Layout quick guide:
 - `--layout flat`: top-level folders or files under `--deals-root` are treated as deals directly
 
 ```bash
-uv run python -m angelcopilot_batch.cli batch validate \
+uv run python -m angelcopilot.cli batch validate \
   --deals-root /path/to/deals-root \
   --layout syndicates \
   --since-days 7 \
@@ -160,11 +162,12 @@ uv run python -m angelcopilot_batch.cli batch validate \
 ```
 
 ```bash
-uv run python -m angelcopilot_batch.cli batch run \
+uv run python -m angelcopilot.cli batch run \
   --deals-root /path/to/deals-root \
   --layout syndicates \
   --since-days 7 \
   --assistant codex \
+  --assistant-model gpt-5.5 \
   --skill-path <path-to-installed-skill-md> \
   --profile .angelcopilot/profile.md \
   --out outputs \
@@ -229,13 +232,13 @@ If you run Codex with a local filesystem skill path, copy the skill folder into:
 
 ```bash
 python3 -m pip install -e .
-python3 -m angelcopilot_batch.cli --help
+python3 -m angelcopilot.cli --help
 ```
 
 - Fallback path if you see `ModuleNotFoundError`:
 
 ```bash
-PYTHONPATH=src python3 -m angelcopilot_batch.cli --help
+PYTHONPATH=src python3 -m angelcopilot.cli --help
 ```
 
 ## Maintainer note

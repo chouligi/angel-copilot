@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from angelcopilot_batch.assistant import (
+from angelcopilot.assistant import (
     ClaudeIntakeClassifier,
     CodexIntakeClassifier,
     CodexRunner,
@@ -133,10 +133,89 @@ def test_codex_runner__builds_expected_command(monkeypatch: pytest.MonkeyPatch, 
     assert result["verdict_one_liner"] == "Strong team but early traction."
 
 
+def test_codex_runner__adds_model_override_when_configured(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    observed: dict[str, object] = {}
+
+    def fake_run(*args: object, **kwargs: object) -> object:
+        observed["cmd"] = args[0]
+        del kwargs
+
+        class Result:
+            stdout = json.dumps(
+                {
+                    "deal_id": "d1",
+                    "company_name": "Acme",
+                    "category_scores": {
+                        "Team": 4.0,
+                        "Market": 4.0,
+                        "Product": 4.0,
+                        "Traction": 4.0,
+                        "Unit Economics": 4.0,
+                        "Defensibility": 4.0,
+                        "Terms": 4.0,
+                    },
+                    "risk_flags": [],
+                    "sectors": ["AI"],
+                    "geographies": ["US"],
+                    "rationale": "ok",
+                    "citations": [],
+                    "category_rationales": {
+                        "Team": "ok",
+                        "Market": "ok",
+                        "Product": "ok",
+                        "Traction": "ok",
+                        "Unit Economics": "ok",
+                        "Defensibility": "ok",
+                        "Terms": "ok",
+                    },
+                    "web_sweep_findings": [],
+                    "web_sweep_sources": [],
+                    "milestones_to_monitor": [],
+                    "key_unknowns": [],
+                    "return_scenarios": [
+                        {"scenario": "Pessimistic", "multiple": "0.3x", "probability": "30%", "rationale": "r"},
+                        {"scenario": "Base", "multiple": "3x", "probability": "50%", "rationale": "r"},
+                        {"scenario": "Optimistic", "multiple": "12x", "probability": "20%", "rationale": "r"},
+                    ],
+                    "assessment_limitations": "none",
+                    "assessment_process": {
+                        "single_deal_equivalent": "yes",
+                        "used_full_rubric": True,
+                        "performed_web_sweep": True,
+                        "reconciled_docs_with_web": True,
+                        "built_three_case_return_model": True,
+                    },
+                }
+            )
+            returncode = 0
+
+        return Result()
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    runner = CodexRunner(model=" gpt-5.5 ")
+
+    runner.run_assessment("prompt text", cwd=tmp_path)
+
+    cmd = observed["cmd"]
+    assert isinstance(cmd, list)
+    assert cmd[:5] == ["codex", "--search", "exec", "--model", "gpt-5.5"]
+
+
 def test_build_assistant_runner__raises_when_binary_missing(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("shutil.which", lambda command: None)
     with pytest.raises(RuntimeError, match="Required CLI 'codex' was not found in PATH"):
         build_assistant_runner("codex")
+
+
+def test_build_assistant_runner__rejects_model_override_for_claude(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("shutil.which", lambda command: "/usr/bin/mock")
+    with pytest.raises(ValueError, match="only supported for --assistant codex"):
+        build_assistant_runner("claude", model="gpt-5.5")
 
 
 def test_codex_intake_classifier__builds_expected_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -166,6 +245,32 @@ def test_codex_intake_classifier__builds_expected_command(monkeypatch: pytest.Mo
     assert cmd[-1] == "-"
     assert "Folder name: Beyond Reach Labs" in str(observed["input"])
     assert "Parent folder: My Syndicate" in str(observed["input"])
+
+
+def test_codex_intake_classifier__adds_model_override(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    observed: dict[str, object] = {}
+
+    def fake_run(*args: object, **kwargs: object) -> object:
+        observed["cmd"] = args[0]
+        del kwargs
+
+        class Result:
+            stdout = '{"is_deal_folder": true, "confidence": 0.9, "reason": "Looks like a company name."}'
+            returncode = 0
+
+        return Result()
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    classifier = CodexIntakeClassifier(cwd=tmp_path, model="gpt-5.5")
+
+    classifier.is_deal_folder("Beyond Reach Labs", parent_name="My Syndicate")
+
+    cmd = observed["cmd"]
+    assert isinstance(cmd, list)
+    assert cmd[:5] == ["codex", "--search", "exec", "--model", "gpt-5.5"]
 
 
 def test_claude_intake_classifier__builds_expected_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

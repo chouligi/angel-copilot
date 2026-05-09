@@ -5,8 +5,8 @@ import re
 import threading
 
 import pytest
-from angelcopilot_batch.models import InvestorProfile
-from angelcopilot_batch.pipeline import run_batch_assessment
+from angelcopilot.models import InvestorProfile
+from angelcopilot.pipeline import run_batch_assessment
 
 
 class FakeRunner:
@@ -233,16 +233,16 @@ def test_run_batch_assessment__emits_deal_failed_when_runner_errors(tmp_path: Pa
     def progress(event: str, payload: dict[str, object]) -> None:
         events.append((event, payload))
 
-    results = run_batch_assessment(
-        deals_root=deals_root,
-        since_days=7,
-        profile=profile,
-        runner=FailingRunner(),
-        cwd=tmp_path,
-        progress_callback=progress,
-    )
+    with pytest.raises(RuntimeError, match="No assessments completed successfully"):
+        run_batch_assessment(
+            deals_root=deals_root,
+            since_days=7,
+            profile=profile,
+            runner=FailingRunner(),
+            cwd=tmp_path,
+            progress_callback=progress,
+        )
 
-    assert results == []
     failed_events = [payload for event, payload in events if event == "deal_failed"]
     assert len(failed_events) == 1
     assert failed_events[0]["reason"] == "assistant_failed"

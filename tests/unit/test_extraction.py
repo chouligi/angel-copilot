@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import zipfile
 
-from angelcopilot_batch.extraction import extract_evidence_bundle
+from angelcopilot.extraction import extract_evidence_bundle
 
 
 def test_extract_evidence_bundle__extracts_txt_and_md(tmp_path: Path) -> None:

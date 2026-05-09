@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from angelcopilot_batch.job import run_batch_job
+from angelcopilot.job import run_batch_job
 
 
 class FakeRunner:
@@ -86,6 +86,7 @@ def test_run_batch_job__logs_progress_and_writes_outputs(tmp_path: Path) -> None
     assert any("prepared deal" in msg for msg in messages)
     assert any("assessment started for 'deal_a'" in msg for msg in messages)
     assert any("done 'deal_a'" in msg for msg in messages)
+    assert any("assessment assistant: backend=codex model=" in msg for msg in messages)
     assert any("Assessing deals sequentially (parallelism=1)." in msg for msg in messages)
 
 
@@ -109,6 +110,8 @@ def test_run_batch_job__logs_parallelism_when_above_one(tmp_path: Path) -> None:
         runner=FakeRunner(),
         logger=messages.append,
         parallelism=4,
+        assistant_model="gpt-5.5",
     )
 
+    assert any("assessment assistant: backend=codex model=gpt-5.5" in msg for msg in messages)
     assert any("Assessing 4 deals in parallel." in msg for msg in messages)

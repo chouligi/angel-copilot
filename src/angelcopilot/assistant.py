@@ -41,6 +41,18 @@ REQUIRED_PAYLOAD_FIELDS = (
 class CodexRunner:
     """Run a single-deal assessment prompt through the Codex CLI."""
 
+    def __init__(self, model: str | None = None) -> None:
+        """Initialize Codex runner.
+
+        Args:
+            model: Optional Codex model override. When omitted, Codex CLI config is used.
+
+        Returns:
+            None.
+        """
+
+        self.model = _normalize_optional_text(model)
+
     def run_assessment(self, prompt: str, cwd: Path) -> dict[str, object]:
         """Execute Codex, parse JSON response, and validate payload fields.
 
@@ -52,7 +64,7 @@ class CodexRunner:
             Validated assessment payload.
         """
 
-        command = ["codex", "--search", "exec", "--skip-git-repo-check", "-C", str(cwd), "-"]
+        command = _build_codex_exec_command(cwd=cwd, model=self.model)
         result = subprocess.run(command, input=prompt, capture_output=True, text=True, check=False)
         if result.returncode != 0:
             raise RuntimeError(f"Codex assessment failed: {result.stderr.strip()}")
@@ -87,17 +99,19 @@ class ClaudeRunner:
 class CodexIntakeClassifier:
     """Codex-backed folder classifier used by smart intake mode."""
 
-    def __init__(self, cwd: Path | None = None) -> None:
+    def __init__(self, cwd: Path | None = None, model: str | None = None) -> None:
         """Initialize classifier execution context.
         
         Args:
             cwd: Optional working directory for codex CLI calls.
+            model: Optional Codex model override. When omitted, Codex CLI config is used.
         
         Returns:
             None.
         """
 
         self.cwd = cwd or Path.cwd()
+        self.model = _normalize_optional_text(model)
 
     def is_deal_folder(self, folder_name: str, parent_name: str | None = None) -> bool:
         """Return whether a folder likely represents a startup deal.
@@ -111,7 +125,7 @@ class CodexIntakeClassifier:
         """
 
         prompt = build_intake_classification_prompt(folder_name=folder_name, parent_name=parent_name)
-        command = ["codex", "--search", "exec", "--skip-git-repo-check", "-C", str(self.cwd), "-"]
+        command = _build_codex_exec_command(cwd=self.cwd, model=self.model)
         result = subprocess.run(command, input=prompt, capture_output=True, text=True, check=False)
         if result.returncode != 0:
             raise RuntimeError(f"Codex intake classification failed: {result.stderr.strip()}")
@@ -318,42 +332,50 @@ def validate_assessment_payload(payload: dict[str, object]) -> dict[str, object]
     }
 
 
-def build_assistant_runner(name: str):
+def build_assistant_runner(name: str, model: str | None = None):
     """Build the configured assistant runner.
 
     Args:
         name: Assistant backend name (``codex`` or ``claude``).
+        model: Optional assistant model override. Supported for ``codex``.
 
     Returns:
         Runner instance implementing ``run_assessment``.
     """
 
+    normalized_model = _normalize_optional_text(model)
     normalized = name.strip().lower()
     if normalized == "codex":
         _require_command("codex")
-        return CodexRunner()
+        return CodexRunner(model=normalized_model)
     if normalized == "claude":
+        if normalized_model:
+            raise ValueError("--assistant-model is only supported for --assistant codex")
         _require_command("claude")
         return ClaudeRunner()
     raise ValueError(f"Unsupported assistant runner: {name}")
 
 
-def build_intake_classifier(name: str, cwd: Path | None = None):
+def build_intake_classifier(name: str, cwd: Path | None = None, model: str | None = None):
     """Build intake folder classifier for smart intake mode.
 
     Args:
         name: Assistant backend name (``codex`` or ``claude``).
         cwd: Optional working directory for the classifier command.
+        model: Optional assistant model override. Supported for ``codex``.
 
     Returns:
         Classifier object or ``None`` when unsupported.
     """
 
+    normalized_model = _normalize_optional_text(model)
     normalized = name.strip().lower()
     if normalized == "codex":
         _require_command("codex")
-        return CodexIntakeClassifier(cwd=cwd)
+        return CodexIntakeClassifier(cwd=cwd, model=normalized_model)
     if normalized == "claude":
+        if normalized_model:
+            raise ValueError("--assistant-model is only supported for --assistant codex")
         _require_command("claude")
         return ClaudeIntakeClassifier(cwd=cwd)
     return None
@@ -488,3 +510,31 @@ def _require_command(command: str) -> None:
         f"Required CLI '{command}' was not found in PATH. "
         f"Install it or add it to PATH, or switch --assistant."
     )
+
+
+def _build_codex_exec_command(cwd: Path, model: str | None = None) -> list[str]:
+    """Build a Codex exec command for prompt-driven runs.
+
+    Args:
+        cwd: Working directory passed to Codex.
+        model: Optional Codex model override.
+
+    Returns:
+        Command argument list suitable for ``subprocess.run``.
+    """
+
+    command = ["codex", "--search", "exec"]
+    normalized_model = _normalize_optional_text(model)
+    if normalized_model:
+        command.extend(["--model", normalized_model])
+    command.extend(["--skip-git-repo-check", "-C", str(cwd), "-"])
+    return command
+
+
+def _normalize_optional_text(value: str | None) -> str | None:
+    """Return stripped optional text or ``None`` when empty."""
+
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None

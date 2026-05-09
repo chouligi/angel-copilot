@@ -2,7 +2,7 @@
 
 This repository follows a conventional Python open-source layout:
 
-- `src/angelcopilot_batch/`: installable package code (CLI + batch pipeline).
+- `src/angelcopilot/`: installable package code (CLI + batch pipeline).
 - `tests/unit/`: fast unit tests for modules and helpers.
 - `tests/integration/`: pipeline/CLI regression and end-to-end style tests.
 - `tests/fixtures/`: synthetic fixture data used by tests.

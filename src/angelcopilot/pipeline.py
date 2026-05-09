@@ -8,15 +8,15 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from angelcopilot_batch.assistant import validate_assessment_payload
-from angelcopilot_batch.intake import discover_recent_deals
-from angelcopilot_batch.models import AssessmentResult, DealInput, InvestorProfile
-from angelcopilot_batch.preparation import (
+from angelcopilot.assistant import validate_assessment_payload
+from angelcopilot.intake import discover_recent_deals
+from angelcopilot.models import AssessmentResult, DealInput, InvestorProfile
+from angelcopilot.preparation import (
     PreparedDealWorkspace,
     cleanup_prepared_workspace,
     prepare_deal_workspace,
 )
-from angelcopilot_batch.scoring import apply_scoring_rules
+from angelcopilot.scoring import apply_scoring_rules
 
 DEFAULT_RUNTIME_SKILL_PATH = Path.home() / ".codex" / "skills" / "angel-copilot" / "SKILL.md"
 EXECUTION_MODE_SKILL_NATIVE = "skill_native"
@@ -120,19 +120,25 @@ def run_batch_assessment(
         },
     )
 
+    prepared_tasks = _prepare_deal_tasks(
+        deals=deals,
+        profile_path=resolved_profile_path,
+        runtime_skill_path=resolved_runtime_skill_path,
+        progress_callback=progress_callback,
+    )
     assessments = _run_deal_assessments(
-        prepared_tasks=_prepare_deal_tasks(
-            deals=deals,
-            profile_path=resolved_profile_path,
-            runtime_skill_path=resolved_runtime_skill_path,
-            progress_callback=progress_callback,
-        ),
+        prepared_tasks=prepared_tasks,
         profile=profile,
         runner=runner,
         cwd=cwd,
         progress_callback=progress_callback,
         parallelism=parallelism,
     )
+    if prepared_tasks and not assessments:
+        raise RuntimeError(
+            f"No assessments completed successfully for {len(prepared_tasks)} prepared deal(s). "
+            "See preceding deal_failed logs for assistant or payload errors."
+        )
 
     sorted_assessments = sorted(assessments, key=lambda item: item.weighted_score, reverse=True)
     _emit_progress(

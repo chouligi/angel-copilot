@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from angelcopilot_batch.models import AssessmentResult
-from angelcopilot_batch.reporting import write_batch_outputs
+from angelcopilot.models import AssessmentResult
+from angelcopilot.reporting import write_batch_outputs
 
 
 def test_write_batch_outputs__writes_md_csv_json(tmp_path: Path) -> None:

@@ -12,8 +12,8 @@ import os
 from pathlib import Path
 import re
 
-from angelcopilot_batch.models import AssessmentResult, BatchOutputPaths
-from angelcopilot_batch.pdf import render_pdf_with_playwright
+from angelcopilot.models import AssessmentResult, BatchOutputPaths
+from angelcopilot.pdf import render_pdf_with_playwright
 
 CATEGORY_ORDER = (
     "Team",

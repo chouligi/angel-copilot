@@ -6,7 +6,7 @@ import io
 from pathlib import Path
 import zipfile
 
-from angelcopilot_batch.models import EvidenceBlock, EvidenceBundle
+from angelcopilot.models import EvidenceBlock, EvidenceBundle
 
 
 def extract_evidence_bundle(file_paths: list[Path]) -> EvidenceBundle:

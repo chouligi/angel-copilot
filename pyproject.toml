@@ -3,9 +3,9 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "angelcopilot-batch"
-version = "0.1.1"
-description = "Batch deal assessment runner for AngelCopilot"
+name = "angelcopilot"
+version = "0.1.2"
+description = "Deal assessment runner for AngelCopilot"
 requires-python = ">=3.11"
 dependencies = [
   "pypdf>=4.0",
@@ -17,7 +17,7 @@ dependencies = [
 dev = ["pytest>=8.0"]
 
 [project.scripts]
-angelcopilot = "angelcopilot_batch.cli:main"
+angelcopilot = "angelcopilot.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

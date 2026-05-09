@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from angelcopilot_batch.intake import discover_recent_deals
+from angelcopilot.intake import discover_recent_deals
 
 
 def test_discover_recent_deals__finds_dummy_fixture_deals(deals_fixtures_root: Path) -> None:

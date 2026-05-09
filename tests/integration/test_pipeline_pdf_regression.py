@@ -5,9 +5,9 @@ import re
 
 import pytest
 
-from angelcopilot_batch.models import InvestorProfile
-from angelcopilot_batch.pipeline import run_batch_assessment
-from angelcopilot_batch.reporting import write_batch_outputs
+from angelcopilot.models import InvestorProfile
+from angelcopilot.pipeline import run_batch_assessment
+from angelcopilot.reporting import write_batch_outputs
 
 
 class FixtureRunner:
@@ -107,7 +107,7 @@ def test_run_batch_assessment__writes_pdf_report_for_fixture_deals(
         del input_html
         output_pdf.write_bytes(b"%PDF-1.4\n% Dummy PDF generated in test.\n")
 
-    monkeypatch.setattr("angelcopilot_batch.reporting.render_pdf_with_playwright", fake_render_pdf)
+    monkeypatch.setattr("angelcopilot.reporting.render_pdf_with_playwright", fake_render_pdf)
 
     output_paths = write_batch_outputs(
         assessments=results,

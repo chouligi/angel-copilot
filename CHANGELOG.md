@@ -6,7 +6,7 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
-- Local batch/dealflow triage support via `angelcopilot_batch` CLI:
+- Local batch/dealflow triage support via `angelcopilot` CLI:
   - `batch validate` for intake preview
   - `batch run` for multi-deal scoring
   - `batch report` for artifact regeneration from saved JSON
@@ -39,4 +39,3 @@ All notable changes to this project are documented in this file.
 - README now makes first-run usage lighter while keeping profile personalization visible.
 - Batch progress logging clarity (preparation vs assessment-start events).
 - Test stability for time-window fixture discovery (fixture mtimes refreshed during tests).
-

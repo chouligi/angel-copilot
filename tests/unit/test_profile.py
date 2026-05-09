@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from angelcopilot_batch.profile import load_investor_profile
+from angelcopilot.profile import load_investor_profile
 
 
 def test_load_investor_profile__parses_markdown_key_values(tmp_path: Path) -> None:

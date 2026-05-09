@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 import re
 
-from angelcopilot_batch.models import DealInput
+from angelcopilot.models import DealInput
 
 SUPPORTED_DOC_EXTENSIONS = {".txt", ".md", ".pdf", ".docx", ".zip"}
 STANDALONE_DEAL_FILE_EXTENSIONS = {".pdf", ".docx", ".zip"}

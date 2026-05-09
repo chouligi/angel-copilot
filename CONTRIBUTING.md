@@ -7,7 +7,7 @@ Thanks for contributing to Angel Copilot.
 This repository combines:
 
 - Skill content (`skills/public/angel-copilot`)
-- Batch CLI pipeline (`src/angelcopilot_batch`)
+- Batch CLI pipeline (`src/angelcopilot`)
 - Packaging/docs for public use
 
 Contributions are welcome across all three areas.

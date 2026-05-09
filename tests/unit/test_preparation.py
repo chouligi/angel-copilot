@@ -4,7 +4,7 @@ from io import BytesIO
 from pathlib import Path
 import zipfile
 
-from angelcopilot_batch.preparation import cleanup_prepared_workspace, prepare_deal_workspace
+from angelcopilot.preparation import cleanup_prepared_workspace, prepare_deal_workspace
 
 
 def test_prepare_deal_workspace__extracts_nested_zip_members(tmp_path: Path) -> None:

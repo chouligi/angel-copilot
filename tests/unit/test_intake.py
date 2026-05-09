@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import zipfile
 
-from angelcopilot_batch.intake import discover_recent_deals
+from angelcopilot.intake import discover_recent_deals
 
 
 class MappingClassifier:

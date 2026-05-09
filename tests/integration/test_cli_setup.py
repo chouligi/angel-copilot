@@ -5,7 +5,7 @@ import sys
 
 import pytest
 
-from angelcopilot_batch import cli
+from angelcopilot import cli
 
 
 def test__run_setup__invokes_playwright_install(monkeypatch: pytest.MonkeyPatch) -> None:

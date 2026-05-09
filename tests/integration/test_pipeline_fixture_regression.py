@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 import re
 
-from angelcopilot_batch.models import InvestorProfile
-from angelcopilot_batch.pipeline import run_batch_assessment
+from angelcopilot.models import InvestorProfile
+from angelcopilot.pipeline import run_batch_assessment
 
 
 class FixtureRunner:

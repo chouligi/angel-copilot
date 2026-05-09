@@ -9,15 +9,15 @@ import subprocess
 import sys
 from textwrap import dedent
 
-from angelcopilot_batch.intake import discover_recent_deals
-from angelcopilot_batch.job import run_batch_job
-from angelcopilot_batch.profile import load_investor_profile
-from angelcopilot_batch.reporting import (
+from angelcopilot.intake import discover_recent_deals
+from angelcopilot.job import run_batch_job
+from angelcopilot.profile import load_investor_profile
+from angelcopilot.reporting import (
     ASSESSMENTS_JSON_FILENAME,
     load_assessments_from_json,
     write_batch_outputs,
 )
-from angelcopilot_batch.scoring import apply_scoring_rules
+from angelcopilot.scoring import apply_scoring_rules
 
 
 class _HelpFormatter(argparse.RawTextHelpFormatter):
@@ -112,6 +112,7 @@ def _run_batch(args: argparse.Namespace) -> int:
         deals_root=args.deals_root,
         since_days=args.since_days,
         assistant=args.assistant,
+        assistant_model=args.assistant_model,
         profile_path=args.profile,
         out=args.out,
         skill_path=args.skill_path,
@@ -245,9 +246,9 @@ def _build_parser() -> argparse.ArgumentParser:
         epilog=dedent(
             """
             Examples:
-              uv run python -m angelcopilot_batch.cli batch validate -h
-              uv run python -m angelcopilot_batch.cli batch run -h
-              uv run python -m angelcopilot_batch.cli batch report -h
+              uv run python -m angelcopilot.cli batch validate -h
+              uv run python -m angelcopilot.cli batch run -h
+              uv run python -m angelcopilot.cli batch report -h
             """
         ).strip(),
     )
@@ -262,18 +263,20 @@ def _build_parser() -> argparse.ArgumentParser:
             """
             Examples:
               # Deals are one level under source folders (source A, personal CRM, etc.)
-              uv run python -m angelcopilot_batch.cli batch run \\
+              uv run python -m angelcopilot.cli batch run \\
                 --deals-root /path/to/deals \\
                 --layout syndicates \\
                 --since-days 7 \\
-                --assistant codex
+                --assistant codex \\
+                --assistant-model gpt-5.5
 
               # Deals live directly under --deals-root
-              uv run python -m angelcopilot_batch.cli batch run \\
+              uv run python -m angelcopilot.cli batch run \\
                 --deals-root /path/to/deals \\
                 --layout flat \\
                 --since-days 30 \\
-                --assistant codex
+                --assistant codex \\
+                --assistant-model gpt-5.5
             """
         ).strip(),
     )
@@ -285,6 +288,11 @@ def _build_parser() -> argparse.ArgumentParser:
         choices=["codex", "claude"],
         default="codex",
         help="Assistant backend used for assessments and smart intake classification.",
+    )
+    execution_group.add_argument(
+        "--assistant-model",
+        default=None,
+        help="Optional model override for Codex, for example gpt-5.5. Omit to use Codex config.",
     )
     execution_group.add_argument(
         "--skill-path",
@@ -332,13 +340,13 @@ def _build_parser() -> argparse.ArgumentParser:
         epilog=dedent(
             """
             Examples:
-              uv run python -m angelcopilot_batch.cli batch validate \\
+              uv run python -m angelcopilot.cli batch validate \\
                 --deals-root /path/to/deals \\
                 --layout syndicates \\
                 --since-days 7 \\
                 --intake-filter smart
 
-              uv run python -m angelcopilot_batch.cli batch validate \\
+              uv run python -m angelcopilot.cli batch validate \\
                 --deals-root /path/to/deals \\
                 --layout flat \\
                 --since-days 30 \\
@@ -356,7 +364,7 @@ def _build_parser() -> argparse.ArgumentParser:
         epilog=dedent(
             """
             Example:
-              uv run python -m angelcopilot_batch.cli batch report \\
+              uv run python -m angelcopilot.cli batch report \\
                 --run-id run_20260329_101500 \\
                 --formats md,csv,json,pdf
             """

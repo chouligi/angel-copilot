@@ -6,17 +6,18 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+import tomllib
 
-from angelcopilot_batch.assistant import build_assistant_runner, build_intake_classifier
-from angelcopilot_batch.models import AssessmentResult, BatchOutputPaths
-from angelcopilot_batch.pipeline import (
+from angelcopilot.assistant import build_assistant_runner, build_intake_classifier
+from angelcopilot.models import AssessmentResult, BatchOutputPaths
+from angelcopilot.pipeline import (
     EXECUTION_MODE_SKILL_NATIVE,
     DEFAULT_RUNTIME_SKILL_PATH,
     build_default_run_id,
     run_batch_assessment,
 )
-from angelcopilot_batch.profile import load_investor_profile
-from angelcopilot_batch.reporting import write_batch_outputs
+from angelcopilot.profile import load_investor_profile
+from angelcopilot.reporting import write_batch_outputs
 
 LogFn = Callable[[str], None]
 
@@ -34,6 +35,7 @@ def run_batch_job(
     deals_root: str | Path,
     since_days: int | None = None,
     assistant: str = "codex",
+    assistant_model: str | None = None,
     profile_path: str | Path = ".angelcopilot/profile.md",
     out: str | Path = "outputs",
     skill_path: str | Path = DEFAULT_RUNTIME_SKILL_PATH,
@@ -52,6 +54,7 @@ def run_batch_job(
         deals_root: Root path containing deal folders/files.
         since_days: Intake lookback window in days; ``None`` includes all deals.
         assistant: Assistant backend name (``codex`` or ``claude``).
+        assistant_model: Optional assistant model override. Supported for Codex.
         profile_path: Path to investor profile markdown file.
         out: Output directory for run artifacts.
         skill_path: Runtime ``SKILL.md`` path used for skill-native prompts.
@@ -75,14 +78,15 @@ def run_batch_job(
     resolved_cwd = Path(cwd).expanduser().resolve() if cwd is not None else Path.cwd()
 
     profile = load_investor_profile(resolved_profile_path)
-    effective_runner = runner or build_assistant_runner(assistant)
+    effective_runner = runner or build_assistant_runner(assistant, model=assistant_model)
     intake_classifier = None
     if intake_filter == "smart":
         try:
-            intake_classifier = build_intake_classifier(assistant, cwd=resolved_cwd)
+            intake_classifier = build_intake_classifier(assistant, cwd=resolved_cwd, model=assistant_model)
         except RuntimeError:
             intake_classifier = None
     log = logger or _default_logger
+    assistant_model_label = _resolve_assistant_model_label(assistant=assistant, assistant_model=assistant_model)
 
     assessments = run_batch_assessment(
         deals_root=resolved_deals_root,
@@ -96,7 +100,11 @@ def run_batch_job(
         top_level_containers=top_level_containers,
         intake_filter=intake_filter,
         folder_classifier=intake_classifier,
-        progress_callback=_build_progress_callback(log),
+        progress_callback=_build_progress_callback(
+            logger=log,
+            assistant=assistant,
+            assistant_model_label=assistant_model_label,
+        ),
         parallelism=parallelism,
     )
 
@@ -123,11 +131,17 @@ def run_batch_job(
     )
 
 
-def _build_progress_callback(logger: LogFn) -> Callable[[str, dict[str, object]], None]:
+def _build_progress_callback(
+    logger: LogFn,
+    assistant: str = "codex",
+    assistant_model_label: str = "Codex config default",
+) -> Callable[[str, dict[str, object]], None]:
     """Map internal progress events to user-facing log lines.
     
     Args:
         logger: Value for ``logger``.
+        assistant: Assistant backend used for the run.
+        assistant_model_label: Human-readable model label for logs.
     
     Returns:
         Callable[[str, dict[str, object]], None]: Value returned by this function.
@@ -170,6 +184,7 @@ def _build_progress_callback(logger: LogFn) -> Callable[[str, dict[str, object]]
                 f"{prefix} batch started: deals={payload.get('total_deals', 0)} "
                 f"since_days={since_label} mode={payload.get('execution_mode')}"
             )
+            logger(f"{prefix} assessment assistant: backend={assistant} model={assistant_model_label}")
             if parallelism > 1:
                 logger(f"{prefix} Assessing {parallelism} deals in parallel.")
             else:
@@ -243,6 +258,45 @@ def _default_logger(message: str) -> None:
     """
 
     print(message, flush=True)
+
+
+def _resolve_assistant_model_label(assistant: str, assistant_model: str | None) -> str:
+    """Resolve the model label shown in batch logs."""
+
+    normalized_override = _normalize_optional_text(assistant_model)
+    if normalized_override:
+        return normalized_override
+
+    if assistant.strip().lower() != "codex":
+        return "provider default"
+
+    configured_model = _read_codex_config_model()
+    return configured_model or "Codex config default"
+
+
+def _read_codex_config_model() -> str | None:
+    """Read the default Codex model from ``~/.codex/config.toml`` when available."""
+
+    config_path = Path.home() / ".codex" / "config.toml"
+    try:
+        with config_path.open("rb") as handle:
+            config = tomllib.load(handle)
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+
+    model = config.get("model")
+    if isinstance(model, str):
+        return _normalize_optional_text(model)
+    return None
+
+
+def _normalize_optional_text(value: str | None) -> str | None:
+    """Return stripped optional text or ``None`` when empty."""
+
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None
 
 
 def _display_path(raw_path: object) -> str:

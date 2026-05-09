@@ -111,7 +111,7 @@ Useful starting points:
 The repository includes:
 
 - Skill content in `skills/public/angel-copilot/`
-- A local batch CLI in `src/angelcopilot_batch/`
+- A local batch CLI in `src/angelcopilot/`
 - Sample inputs, outputs, and screenshots for evaluation
 
 For technical setup and local workflows, see [Local setup and workflows](docs/local-setup.md). For code contributions, see [CONTRIBUTING.md](CONTRIBUTING.md). For a quick map of the repo, see [docs/repository_structure.md](docs/repository_structure.md).
