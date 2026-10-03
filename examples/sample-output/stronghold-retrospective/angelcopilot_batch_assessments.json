@@ -1,0 +1,378 @@
+{
+  "schema_version": 2,
+  "run_id": "stronghold-retrospective",
+  "assessments": [
+    {
+      "deal_id": "Stronghold-retrospective-2026-07-22",
+      "company_name": "Stronghold AI (Ponteiro SAS)",
+      "category_scores": {
+        "Team": 4.5,
+        "Market": 4.6,
+        "Product": 3.8,
+        "Traction": 3.1,
+        "Unit Economics": 3.0,
+        "Defensibility": 3.4,
+        "Terms": 2.5
+      },
+      "risk_flags": [
+        "Approximately EUR 41.2 million of commercial interest combines contracts, LOIs, an NDA, demonstrations, quotations, and pipeline rather than recognized or firmly committed revenue.",
+        "RoverTech publicly describes a June 2026 memorandum and joint-development relationship; the supplied memo describes a five-year commercial agreement targeting approximately 3,700 units annually.",
+        "Projected revenue of EUR 1.6 million in 2026 and EUR 11.0 million in 2027 is not supported by invoices, collections, audited accounts, or a contract-by-contract backlog bridge.",
+        "Defence-hardware industrialisation, certification, sovereign supply-chain requirements, warranty exposure, and working capital could require substantially more financing.",
+        "Product performance claims lack independent detection-rate, false-alarm, latency, environmental, reliability, and adversarial-test results.",
+        "The claimed two-year moat and proprietary IP position are not supported by a company patent schedule, freedom-to-operate analysis, or evidence of IP and data assignment.",
+        "The EUR 17.5 million post-money SAFE cap is based substantially on future contract conversion rather than established revenue.",
+        "SPV economics include approximately 4% estimated expenses and 20% carry, with no management fee.",
+        "No direct pro-rata or company-level information rights were evidenced for the limited partner.",
+        "The lead commitment may legally be as low as zero; the deal page reports only a EUR 8,766lead investment against a EUR 175,316allocation.",
+        "Mana Ventures is an existing investor and may hold earlier, more favourable terms, creating a disclosed conflict.",
+        "The investor becomes a partner in a Delaware series partnership investing cross-border into a French SAS, introducing legal, reporting, currency, and tax complexity.",
+        "Military and dual-use exports may require authorisations, end-user controls, sanctions compliance, and protection of sensitive operational data.",
+        "The ten-year fund term may be extended, and secondary liquidity is unlikely.",
+        "Customer concentration in Ukrainian and government defence programmes creates geopolitical, procurement, payment, and programme-cancellation risk."
+      ],
+      "sectors": [
+        "Defence technology",
+        "Counter-UAS",
+        "Artificial intelligence",
+        "Edge AI",
+        "Electronic warfare",
+        "Multimodal sensing",
+        "Autonomous systems",
+        "Critical-infrastructure security",
+        "Dual-use technology"
+      ],
+      "geographies": [
+        "France",
+        "Ukraine",
+        "European Union",
+        "NATO allied markets"
+      ],
+      "rationale": "WAIT at a weighted score of 3.85/5. Stronghold has an unusually relevant founding team, real product specificity, early Ukrainian field exposure, a publicly confirmed RoverTech partnership, and powerful NATO/EU demand tailwinds. The present evidence does not justify treating approximately EUR 41.2 million of mixed commercial interest as backlog or using projected 2027 revenue as if contracted. The decisive diligence need is a reconciliation from agreements and LOIs to binding minimum quantities, deliveries, invoices, collections, and gross profit. Terms further reduce attractiveness through approximately 4% expenses, 20% carry, indirect SPV ownership, limited evidenced rights, and cross-border complexity. Illustrative return assumptions use a €2,000 subscription, 4% expenses leaving approximately €1,920 economically exposed, a EUR 17.5 million post-money entry cap, approximately 0.0096% look-through ownership at entry, 45% future dilution, approximately 0.0053% ownership at exit, no follow-on or pro-rata participation, 20% carry on profits, no management fee, an eight-year hold, and no tax or EUR/USD adjustment. The probability-weighted value of the three cases is approximately 4.60x or €9,196, equivalent to an illustrative 21.0% annualized return from expected value; this is highly sensitive to contract conversion and is not a forecast. Educational decision-support only — verify independently before investing.",
+      "citations": [
+        {
+          "id": "D1",
+          "source": "Stronghold AI | AngelList deal memo",
+          "date": "2026-07-22",
+          "url": "/var/folders/lr/j7n9ny5x2g5291sgccngzddh0000gn/T/angelcopilot_stronghold_7c_6g0l2/docs/Stronghold AI _ AngelList.pdf",
+          "note": "Source for the EUR 1.8 million seed SAFE, EUR 17.5 million post-money cap, fees and carry, team narrative, approximately EUR 41.2 million commercial-interest claim, product claims, projections, unit economics, disclosed conflicts, and stated risks."
+        },
+        {
+          "id": "D2",
+          "source": "Stronghold AI private placement memorandum",
+          "date": "2026-07-10",
+          "url": "/var/folders/lr/j7n9ny5x2g5291sgccngzddh0000gn/T/angelcopilot_stronghold_7c_6g0l2/docs/Stronghold AI - PPM.docx",
+          "note": "Identifies the portfolio company as French entity Ponteiro, the 20% carry, zero management fee, ten-year termination framework, speculative-risk disclosures, manager discretion, and the absence of platform diligence on the subscriber's behalf."
+        },
+        {
+          "id": "D3",
+          "source": "Stronghold AI limited partnership agreement",
+          "date": "2026-07-10",
+          "url": "/var/folders/lr/j7n9ny5x2g5291sgccngzddh0000gn/T/angelcopilot_stronghold_7c_6g0l2/docs/Stronghold AI - LPA.docx",
+          "note": "Governs the Delaware series partnership, distributions, confidentiality, voting recommendations, manager powers, transfer restrictions, term and extensions, and the 5% investment-adviser plus 15% special-partner carry allocation."
+        },
+        {
+          "id": "D4",
+          "source": "Stronghold AI subscription agreement",
+          "date": "2026-07-10",
+          "url": "/var/folders/lr/j7n9ny5x2g5291sgccngzddh0000gn/T/angelcopilot_stronghold_7c_6g0l2/docs/Stronghold AI - Subscription Agreement.docx",
+          "note": "Sets investor representations, eligibility obligations, cross-border subscription mechanics, and acknowledgement of the offering documents."
+        },
+        {
+          "id": "D5",
+          "source": "Copy of Disclaimers",
+          "date": "2026-07-03",
+          "url": "/var/folders/lr/j7n9ny5x2g5291sgccngzddh0000gn/T/angelcopilot_stronghold_7c_6g0l2/docs/Copy of Disclaimers.pdf",
+          "note": "States that third-party content may be based on company-provided information, performance may differ due to fees and expenses, and investors must conduct their own evaluation."
+        },
+        {
+          "id": "FX1",
+          "source": "Official Journal of the European Union: Euro exchange rates, 22 July 2026",
+          "source_type": "Official exchange-rate reference",
+          "date": "2026-07-22",
+          "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=OJ:C_202603604",
+          "note": "The ECB reference rate was EUR 1 = USD 1.1408; USD-denominated historical amounts in this retrospective are converted to EUR and rounded."
+        }
+      ],
+      "category_rationales": {
+        "Team": "The founders combine electronic-warfare and technical credentials with defence-program experience. Several specific résumé claims and the ability to build the required engineering and production team were not independently verified.",
+        "Market": "Counter-UAS demand is supported by defence priorities, but procurement is fragmented, competitive and dependent on programme timing. The company’s broad market estimate is not used as proof of obtainable sales.",
+        "Product": "AURA and LUMINA address defined sensing needs and have reported field exposure. Independent detection, false-alarm, environmental and reliability results were not supplied.",
+        "Traction": "RoverTech publicly confirmed a memorandum and joint development. The supplied approximately EUR 41.2 million combines contracts with nonbinding interest and pipeline; binding orders, invoices and collections were not reconciled.",
+        "Unit Economics": "The supplied hardware bill of materials suggests a possible margin, but excludes material delivery, service, warranty, logistics and working-capital costs. Scalable delivered economics remain unproven.",
+        "Defensibility": "Field data, integrations and qualification history could strengthen the position as deployments grow. A durable technical lead, company-owned IP and freedom to operate were not established in the reviewed evidence.",
+        "Terms": "The supplied materials state a EUR 17.5 million post-money SAFE cap, approximately 4% expenses and 20% carry. Conversion, rights and final investor-level costs require document review; no follow-on investment is assumed in this review."
+      },
+      "web_sweep_findings": [],
+      "web_sweep_sources": [
+        {
+          "id": "W1",
+          "title": "Stronghold AI | Threat detection, deployable everywhere",
+          "url": "https://www.stronghold-ai.com/",
+          "date": "2026-07-19",
+          "why_relevant": "Official product, deployment, performance-envelope, roadmap, and dual-use positioning."
+        },
+        {
+          "id": "W2",
+          "title": "RoverTech: Stronghold AI joins the TARANTULA active-protection programme",
+          "url": "https://rovertech.co.ua/do-programy-aktyvnogo-zahystu-tarantula-vid-rovertech-doluchylasya-frantsuzka-kompaniya-stronghold-ai/",
+          "date": "2026-06-17",
+          "why_relevant": "Customer-side confirmation of the memorandum, partnership scope, and AURA joint-development plan."
+        },
+        {
+          "id": "W3",
+          "title": "NATO Allies invest 40 billion dollars in counter-drone capabilities and drone training",
+          "url": "https://www.nato.int/en/news-and-events/articles/news/2026/07/07/nato-allies-invest-40-billion-dollars-in-counter-drone-capabilities-and-drone-training",
+          "date": "2026-07-07",
+          "why_relevant": "Primary evidence of market demand, procurement direction, compatibility requirements, and planned counter-drone spending."
+        },
+        {
+          "id": "W4",
+          "title": "European Commission Action Plan on Drone and Counter Drone Security",
+          "url": "https://digital-strategy.ec.europa.eu/en/policies/drone-security",
+          "date": "2026-02-12",
+          "why_relevant": "Primary evidence of EU detection, testing, industrialisation, critical-infrastructure, and Ukraine-cooperation priorities."
+        },
+        {
+          "id": "W5",
+          "title": "PONTEIRO company record",
+          "url": "https://www.societe.com/societe/ponteiro-935089268.html",
+          "date": "2026-07-09",
+          "why_relevant": "Corroborates the active French SAS, Stronghold AI trading name, formation date, registered activity, and CEO."
+        },
+        {
+          "id": "W6",
+          "title": "Hexa portfolio profile: Stronghold AI",
+          "url": "https://www.hexa.com/companies/stronghold",
+          "date": "2026-07-08",
+          "why_relevant": "Independent ecosystem source confirming company status, positioning, and the two co-founders."
+        },
+        {
+          "id": "W7",
+          "title": "Rafael Licursi public professional profile",
+          "url": "https://fr.linkedin.com/in/rafaellicursi",
+          "date": "2026-07-08",
+          "why_relevant": "Supports technical publications, radar and antenna expertise, professional affiliations, and founder patent history."
+        },
+        {
+          "id": "W8",
+          "title": "EU Regulation 2021/821 on dual-use export controls",
+          "url": "https://eur-lex.europa.eu/eli/reg/2021/821/oj/?locale=EN",
+          "date": "2025-11-15",
+          "why_relevant": "Current consolidated framework for exports, brokering, technical assistance, transit, transfers, authorisations, and compliance controls affecting dual-use technology."
+        },
+        {
+          "id": "W9",
+          "title": "European Commission AI Act Service Desk: Article 2 scope",
+          "url": "https://ai-act-service-desk.ec.europa.eu/en/ai-act/article-2",
+          "date": "2024-07-12",
+          "why_relevant": "Clarifies the military, defence, and national-security exclusion and the potential application to non-exclusive civilian uses."
+        },
+        {
+          "id": "W10",
+          "title": "Dassault Aviation and Harmattan AI strategic partnership and financing",
+          "url": "https://www.dassault-aviation.com/en/group/press/press-kits/harmattan-ais-200-million-series-b-led-by-dassault-aviation/",
+          "date": "2026-01-12",
+          "why_relevant": "Corroborates Harmattan's position in autonomous defence systems and illustrates the strength and capitalisation of adjacent competitors."
+        }
+      ],
+      "milestones_to_monitor": [],
+      "key_unknowns": [],
+      "return_scenarios": [],
+      "assessment_limitations": "Retrospective layout example only. Facts and research status are preserved as of 2026-07-22; no refreshed research was performed. The historical return cases were not converted because they do not supply a distinct total-loss scenario.",
+      "assessment_process": {
+        "single_deal_equivalent": "yes",
+        "used_full_rubric": true,
+        "performed_web_sweep": true,
+        "reconciled_docs_with_web": true,
+        "built_three_case_return_model": true
+      },
+      "evidence_sources": [],
+      "extraction_warnings": [],
+      "hypothetical_investment": 2000.0,
+      "investment_currency": "EUR",
+      "investment_basis": "profile_ticket_typical",
+      "dilution_assumption": "Not recorded or model unavailable.",
+      "verdict_one_liner": "Resolve before investing: Commercial interest is not verified backlog; Independent product performance is unavailable; Production economics and cash needs are incomplete",
+      "why_not_invest_now": [],
+      "what_would_upgrade_to_invest": [],
+      "market_context": "",
+      "reconciliation_gaps": [],
+      "fit_call": "",
+      "founder_questions": [],
+      "weighted_score": 3.845,
+      "verdict": "WAIT",
+      "attention_flag": false,
+      "attention_reason": "Resolve before investing: Commercial interest is not verified backlog; Independent product performance is unavailable; Production economics and cash needs are incomplete",
+      "profile_fit": 0.5,
+      "schema_version": 2,
+      "category_drivers": {
+        "Team": "Relevant defence and electronic-warfare experience; key résumé claims and production hiring need verification",
+        "Market": "Strong demand tailwinds; fragmented procurement and intense competition",
+        "Product": "Defined sensing products with field exposure; independent reliability results are missing",
+        "Traction": "Public partnership confirmed; headline commercial interest is not reconciled to binding orders",
+        "Unit Economics": "Promising preliminary hardware margin; delivered cost and working capital are unknown",
+        "Defensibility": "Integration and field data may help; company-owned IP and durable advantage are unproven",
+        "Terms": "Headline cap and SPV costs disclosed; conversion and investor rights need review"
+      },
+      "category_confidence": {
+        "Team": "medium",
+        "Market": "medium",
+        "Product": "medium",
+        "Traction": "low",
+        "Unit Economics": "low",
+        "Defensibility": "low",
+        "Terms": "medium"
+      },
+      "effective_weights": {
+        "Team": 0.25,
+        "Market": 0.2,
+        "Product": 0.15,
+        "Traction": 0.15,
+        "Unit Economics": 0.1,
+        "Defensibility": 0.1,
+        "Terms": 0.05
+      },
+      "score_coverage": 1.0,
+      "deal_snapshot": {
+        "report_note": "RETROSPECTIVE FORMAT REVIEW — historical decision and evidence as of 2026-07-22; research was not refreshed. Evidence-strength ratings are retrospective editorial judgments because the original assessment did not record them. USD-denominated source amounts are shown as EUR equivalents at the ECB rate of EUR 1 = USD 1.1408 for 2026-07-22 (rounded); original documents use USD. The three questions below are an editorial prioritization of that record, not a current recommendation.",
+        "as_of": "2026-07-22",
+        "product": "Counter-UAS and electronic-warfare sensing systems, as described in the historical memo.",
+        "customer": "Defence and government programmes; customer mix and binding order status require verification.",
+        "stage": "Seed",
+        "instrument": "SPV exposure through a Delaware series partnership into a French SAS, per supplied materials.",
+        "terms": "Historical materials state a EUR 17.5 million post-money SAFE cap, approximately 4% expenses and 20% carry. Conversion and investor-level terms require document review.",
+        "market_timing": "Defence procurement demand is relevant; programme timing, customer commitments and production conversion remain uncertain."
+      },
+      "decision": {
+        "verdict": "WAIT",
+        "reason": "Resolve before investing: Commercial interest is not verified backlog; Independent product performance is unavailable; Production economics and cash needs are incomplete",
+        "assessment_summary": {
+          "investment_case": "Stronghold targets a consequential defence need: affordable counter-UAS sensing that can operate in contested environments. The founders bring relevant electronic-warfare and technical experience, and AURA and LUMINA are specific products rather than a broad AI claim. If the systems prove reliable and procurements convert into repeat production, the company could earn a valuable position in a growing market.",
+          "supporting_evidence": "The historical review found public evidence for founder credentials, product existence, AURA field exposure and RoverTech joint development. RoverTech’s announcement corroborates a memorandum and programme collaboration, which is meaningful external validation. The source memo reports approximately EUR 41.2 million of commercial interest after conversion, but the review found that figure combines contracts with LOIs, quotations, demonstrations and pipeline; it is not verified backlog. [D1] [W1] [W2]",
+          "counterarguments": "The public partnership does not substantiate the memo’s five-year purchase characterization or minimum commitments. Independent results for detection, false alarms, environmental performance and reliability were absent. Preliminary hardware margin omits integration, service, warranty, logistics and working capital, leaving production funding unclear. At an approximately EUR 17.5 million post-money SAFE cap, the entry price assumes substantial commercial conversion. The historic return model lacks a distinct total-loss case. [D1] [D2] [FX1]",
+          "decision_logic": "The historical WAIT reflects missing proof, not weak market relevance or founder capability. Recommend zero until enforceable commitments, independent product results and fully loaded production economics are verified. These establish demand, procurement readiness and a financeable margin path. Then reassess price, SPV costs and net returns using final legal terms and a full-loss scenario. This reflects 2026-07-22 evidence and is not a current recommendation."
+        },
+        "economics": "unknown",
+        "evidence": "incomplete",
+        "fit": "unknown",
+        "suggested_amount": 0.0,
+        "sizing_reason": "No commitment pending verification of the three decision-critical issues.",
+        "next_action": "Do not commit; review the stated blocking conditions.",
+        "minimum_ticket": 0,
+        "proposed_verdict": "WAIT",
+        "proposed_amount": 0,
+        "proposed_reason": "Binding commercial commitments, independent performance evidence and fully loaded production economics are unresolved.",
+        "proposed_next_action": "Verify binding programme commitments, independent performance results and fully loaded production economics; then reassess.",
+        "model_amount": 2000.0,
+        "judgment_basis": "Qualitative investment judgment; no personal return hurdle supplied",
+        "return_hurdle": null
+      },
+      "diligence_issues": [
+        {
+          "id": "I1",
+          "priority": 1,
+          "status": "blocker",
+          "evidence_state": "conflicting",
+          "title": "Commercial interest is not verified backlog",
+          "finding": "The historical memo combines contracts, LOIs, an NDA, demonstrations, quotations and pipeline into an approximately EUR 41.2 million headline figure.",
+          "decision_impact": "The order value and production forecast cannot be underwritten as committed revenue.",
+          "evidence_needed": "Counterparty-level schedule linking executed agreements to enforceable quantities, price, cancellation rights, deliveries, invoices and cash collected.",
+          "reconsideration_condition": "Independent review confirms material binding minimum purchases and credible delivery timing.",
+          "source_ids": [
+            "D1",
+            "D2"
+          ]
+        },
+        {
+          "id": "I2",
+          "priority": 2,
+          "status": "blocker",
+          "evidence_state": "unknown",
+          "title": "Independent product performance is unavailable",
+          "finding": "The historical materials make performance claims but do not provide independent detection, false-alarm, environmental and reliability results.",
+          "decision_impact": "Field performance is central to procurement, repeat deployments and product liability exposure.",
+          "evidence_needed": "Independent test results against agreed operating conditions and a customer reference.",
+          "reconsideration_condition": "A qualified third party or customer confirms performance against stated requirements.",
+          "source_ids": [
+            "D1",
+            "W1"
+          ]
+        },
+        {
+          "id": "I3",
+          "priority": 3,
+          "status": "blocker",
+          "evidence_state": "unknown",
+          "title": "Production economics and cash needs are incomplete",
+          "finding": "The assessment identifies certification, warranty, working capital and industrialisation as material but unresolved costs.",
+          "decision_impact": "The company may require substantially more capital or deliver below the forecast margin.",
+          "evidence_needed": "Fully loaded unit-cost, production-capacity, certification, warranty and working-capital plan tied to the forecast.",
+          "reconsideration_condition": "A bottom-up plan supports positive delivered margin and a financeable path to serial production.",
+          "source_ids": [
+            "D1",
+            "D2"
+          ]
+        }
+      ],
+      "questions": [
+        {
+          "question": "Please reconcile the approximately EUR 41.2 million headline line by line, identifying binding minimum quantities, cancellation rights, delivery dates, invoices and cash collected.",
+          "priority": 1,
+          "audience": "founder",
+          "optional": false,
+          "issue_id": "I1",
+          "evidence_requested": "Counterparty schedule linked to redacted executed agreements, invoices and receipts."
+        },
+        {
+          "question": "Which independent test report supports the detection, false-alarm and reliability claims, and may we speak with the test customer?",
+          "priority": 2,
+          "audience": "founder",
+          "optional": false,
+          "issue_id": "I2",
+          "evidence_requested": "Test report with conditions, results and customer permission for reference."
+        },
+        {
+          "question": "Can you share the fully loaded unit economics and working-capital plan for serial production?",
+          "priority": 3,
+          "audience": "founder",
+          "optional": false,
+          "issue_id": "I3",
+          "evidence_requested": "Costed production plan including certification, warranty, integration and working capital."
+        }
+      ],
+      "return_assumptions": {},
+      "return_summary": {
+        "status": "unavailable",
+        "reason": "Explicit ownership, fees and exit assumptions were not supplied."
+      },
+      "recommended_investment": 0.0,
+      "decision_reason": "Resolve before investing: Commercial interest is not verified backlog; Independent product performance is unavailable; Production economics and cash needs are incomplete",
+      "next_action": "Do not commit; review the stated blocking conditions.",
+      "sizing_reason": "Investor profile typical ticket.",
+      "decision_warnings": [
+        "Resolve before investing: Commercial interest is not verified backlog; Independent product performance is unavailable; Production economics and cash needs are incomplete"
+      ],
+      "investor_constraints": {
+        "region": "EU (Amsterdam; origin GR)",
+        "currency": "EUR",
+        "inferred_risk_level": "High (2.75 via Q1–Q4)",
+        "ticket_typical": 2000.0,
+        "ticket_min": 2000.0,
+        "ticket_max": 5000.0,
+        "evaluation_weight_overrides": {},
+        "return_hurdle": null,
+        "remaining_angel_budget": null,
+        "sectors_themes": [
+          "AI",
+          "Tech",
+          "E-commerce"
+        ],
+        "geo_focus": [
+          "EU",
+          "US"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+deal_id,company_name,weighted_score,score_coverage,verdict,recommended_investment,investment_currency,decision_reason,next_action
+fictional_meridianops,Fictional MeridianOps,3.905,1.0,INVEST,2000.0,EUR,"Reviewed evidence, suitable economics and investor fit support the normal minimum cheque.",Commit the normal cheque on the reviewed terms; monitor retention through regular reporting.
+fictional_fieldsense,Fictional FieldSense,,0.85,WAIT,,EUR,Resolve before investing: Pilot versus binding revenue; Unverified field reliability; Delivery economics incomplete,Do not commit; review the stated blocking conditions.
+fictional_sidecardata,Fictional SidecarData,3.42,1.0,PASS,,EUR,The current entry price leaves an unattractive net return case.,Decline the current opportunity; revisit only after materially different pricing.

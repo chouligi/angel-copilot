@@ -97,4 +97,5 @@ def test_run_batch_assessment__processes_fixture_deals_without_prod_docs(deals_f
     assert len(results) == 2
     result_ids = {item.deal_id for item in results}
     assert result_ids == {"alpha_ai", "beta_ops"}
-    assert any(item.attention_flag for item in results)
+    assert all(item.verdict == "WAIT" and item.recommended_investment == 0 for item in results)
+    assert not any(item.attention_flag for item in results)

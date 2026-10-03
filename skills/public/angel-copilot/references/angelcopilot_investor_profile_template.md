@@ -22,7 +22,10 @@ This is the structured format AngelCopilot uses to remember and reason about inv
 ## Risk and Strategy
 - Inferred Risk Level: (Low / Medium / High)
 - Ticket Size Range: (min / typical / max)
-- Follow-on Reserve Ratio: (e.g., 1.0 = same as initial)
+- Remaining Angel Budget (optional):
+- Base-case annualized return hurdle (optional, decimal or percent):
+- Evaluation Weight Overrides (optional; seven rubric categories, fractions or percentages):
+- Follow-on Reserve Ratio (optional):
 - Target Number of Deals per Year:
 - Target Angel Allocation (% of Net Worth):
 - Preferred Instruments: (SAFE, Equity, Convertible)

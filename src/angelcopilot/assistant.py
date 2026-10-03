@@ -8,6 +8,8 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
+from angelcopilot.contract import validate_modern
+from angelcopilot.economics import number, validate_scenarios
 
 REQUIRED_SCORE_KEYS = (
     "Team",
@@ -249,6 +251,17 @@ def validate_assessment_payload(payload: dict[str, object]) -> dict[str, object]
         Normalized payload with required fields and canonical value types.
     """
 
+    if payload.get("schema_version") == 2:
+        result = validate_modern(payload)
+        for key in ("deal_id", "company_name"):
+            if not isinstance(result.get(key), str) or not result[key].strip():
+                raise ValueError(f"{key} must be nonempty text")
+        process = result["assessment_process"]
+        for key, value in process.items():
+            if key not in {"notes", "single_deal_equivalent"} and not isinstance(value, bool):
+                raise ValueError(f"assessment_process.{key} must be a boolean")
+        return result
+
     for field in REQUIRED_PAYLOAD_FIELDS:
         if field not in payload:
             raise ValueError(f"Missing required field: {field}")
@@ -261,7 +274,7 @@ def validate_assessment_payload(payload: dict[str, object]) -> dict[str, object]
     for key in REQUIRED_SCORE_KEYS:
         if key not in scores:
             raise ValueError(f"Missing required score key: {key}")
-        normalized_scores[key] = float(scores[key])
+        normalized_scores[key] = None if scores[key] is None else number(scores[key], key, maximum=5)
 
     category_rationales = payload["category_rationales"]
     if not isinstance(category_rationales, dict):
@@ -278,6 +291,9 @@ def validate_assessment_payload(payload: dict[str, object]) -> dict[str, object]
         raise ValueError("return_scenarios must be a list")
     if len(return_scenarios) < 3:
         raise ValueError("return_scenarios must include at least 3 scenarios")
+    if any(not isinstance(item, dict) for item in return_scenarios):
+        raise ValueError("return_scenarios must contain only objects")
+    validate_scenarios(return_scenarios)
 
     assessment_process = payload["assessment_process"]
     if not isinstance(assessment_process, dict):

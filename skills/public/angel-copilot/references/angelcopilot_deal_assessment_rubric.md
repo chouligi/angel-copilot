@@ -1,57 +1,45 @@
 # AngelCopilot Deal Assessment Rubric
 
-AngelCopilot uses a structured, weighted rubric to evaluate early-stage startup deals. Each company is scored across seven dimensions with weighted values reflecting typical pre-seed and seed priorities.
+## Seven factors
 
-## Scoring Criteria
+Assess all seven factors. The default weights remain stable so companies can be compared. Product measures customer value and performance today; Defensibility measures the durability of the advantage.
 
-| Dimension        | Weight | What It Measures                                                             |
-|-----------------|--------|-------------------------------------------------------------------------------|
-| Team            | 0.25   | Founder-market fit, execution ability, technical depth, hiring needs          |
-| Market          | 0.20   | Size, urgency, growth, timing, competitive intensity                          |
-| Product         | 0.15   | Differentiation, defensibility, usability, current stage                      |
-| Traction        | 0.15   | Revenue or user traction, proof points, customer validation                   |
-| Unit Economics  | 0.10   | CAC, LTV, margins, early monetization signals                                 |
-| Defensibility   | 0.10   | IP, data moat, network effects, switching costs                               |
-| Terms           | 0.05   | Valuation fairness, instrument type, key investor rights                      |
+| Factor | Weight | Score 1 anchor | Score 3 anchor | Score 5 anchor |
+|---|---:|---|---|---|
+| Team | 25% | Material execution or integrity weaknesses | Relevant team with gaps and some execution evidence | Exceptional founder-market fit and independently supported execution; key roles covered |
+| Market | 20% | Weak urgency, inaccessible demand or adverse timing | Clear customer need and reachable wedge, with competitive constraints | Strong urgent demand, accessible buyers and compelling timing, supported by specific evidence |
+| Product | 15% | Poor customer value or material technical weakness | Working product addresses a clear problem; performance remains partly unproven | Independently demonstrated advantage and reliable delivery for the company's stage |
+| Traction | 15% | Weak or deteriorating customer validation | Credible paid adoption or stage-appropriate pilot evidence | Exceptional repeatable demand, retention and conversion for the company's stage |
+| Unit Economics | 10% | Structurally unattractive delivery economics | Plausible economics with cost and scalability questions | Fully supported margins, acquisition/delivery costs and capital needs consistent with scaling |
+| Defensibility | 10% | Advantage is readily copied or structurally weak | Plausible moat mechanism that is not yet compounding | Evidence that switching costs, IP, data or distribution advantages are compounding |
+| Terms | 5% | Price or rights materially undermine the investor's net payoff | Reasonable price and understandable security with trade-offs | Attractive price and security economics; transparent fees, conversion and investor protections |
 
-Score each factor from 0.0 to 5.0 and compute a weighted average.
+Use 0–5 with at most one decimal. Scores 2 and 4 interpolate between anchors; 0 is reserved for demonstrated extreme weakness, never absence of information. Write the evidence that supports each judgment and what holds its score back. For genuinely unassessable factors, use null / Not Scored, explain the gap and do not manufacture an aggregate. Report weighted totals only when all positively weighted categories can be scored, with score coverage separately. Keep confidence (high / medium / low / unknown) distinct from company quality.
 
-## Verdict Thresholds
+Anchor evidence to stage and business model: pre-seed customer experiments differ from seed retention; hardware needs reliability, yield, warranty and working-capital evidence; biotech needs scientific, regulatory and manufacturing milestones. Avoid demanding mature SaaS metrics from every startup. A preference mismatch belongs in investor suitability, not a fabricated low company score.
 
-| Weighted Score | Recommendation | Meaning
-|---------------|----------------|--------|
-| >= 4.2        | INVEST         | Strong strategic and financial fit
-| 3.5 to 4.1    | WAIT           | Promising but needs validation, traction, or clarity
-| < 3.5         | PASS           | Misalignment or material red flags
+Apply supported `evaluation_weight_overrides`, merge with defaults and normalize to 100%. Show effective weights. These are preference weights, not predictive coefficients.
 
-Use a clear recommendation banner and a one-sentence rationale, for example:
+## Recommendation is an investment judgment
 
-RECOMMENDATION: INVEST
-Clear moat, strong founding team, and fair terms at pre-seed.
+The 4.2 / 3.5 bands are retired as verdict rules. Scores are descriptive, not calibrated return predictors. Judge the opportunity at the actual terms and the investor's normal cheque, using evidence, net economics and known constraints.
 
-## Return Scenarios (8-year horizon)
+- **INVEST — a normal cheque now:** the investment case is attractive, material evidence is sufficient, terms and net outcome potential can be underwritten, and the normal cheque fits the investor's stated constraints. Specify the total cash commitment and sizing reason. Do not defer material diligence until after an INVEST call.
+- **WAIT — zero now:** a material but realistically resolvable evidence, terms or suitability gap blocks commitment. State the verifiable conditions that could change the call. A deadline or attractive story is not a reason to suggest an exploratory cheque.
+- **PASS — zero under the current opportunity/terms:** a deal-breaking fact, incompatible constraint or unattractive risk/reward case defeats the opportunity. State what materially different terms or facts, if any, would justify reopening it. Do not demand unnecessary founder work on an opportunity already ruled out.
 
-Include a 3-scenario return model:
+A fatal issue yields PASS; an unresolved blocker prevents INVEST. Distinguish those from ordinary residual venture risk, which can remain in an INVEST. Do not let a high score cancel a blocker. Do not make lack of publicly available private-company data evidence of fraud or poor performance.
 
-| Scenario    | Multiple | Probability | Cash-out | IRR  | Rationale |
-|-------------|----------|-------------|----------|------|-----------|
-| Pessimistic | 0.3x     | 30%         | 1,500    | -20% | Market stalls or flat-lined |
-| Base Case   | 3x       | 50%         | 15,000   | 21%  | Mid-sized exit or acquihire |
-| Optimistic  | 12x      | 20%         | 60,000   | 50%+ | Strong PMF, scale, strategic M&A |
+Use cheque minimum, typical and maximum only from the investor profile. If no complete range is stored, do not recommend a cheque or model returns using an invented ticket; ask the investor to set the range. Recommend within the stored range; a below-minimum probe is not INVEST. Moving away from the typical ticket requires an explicit conviction, concentration or known budget reason. Quote all-in cash outlay, including disclosed entry expenses, and check the subscription minimum on the appropriate fee basis. Do not invent remaining portfolio capacity.
 
-### Dilution Treatment
+Follow-on participation is not part of the default case or sizing. Lack of pro-rata is not by itself a blocker for someone who rarely follows on. Reporting and information access can still matter to a passive investor. Only discuss later participation if the user asks or a particular security provision materially changes the current economics.
 
-Whenever ownership, cash-out, or return multiples are shown, AngelCopilot must explicitly state whether figures are **pre-dilution** or **post-dilution**.
+## Net return stress tests
 
-Default:
-- Use **post-dilution** estimates unless the user requests otherwise.
-- Always include:
-  - **ownership at entry**
-  - **assumed future dilution**
-  - **ownership at exit**
-  - whether returns assume **no follow-ons** or **pro-rata/follow-on participation**
+Model one normal cheque with no follow-ons. Use four distinct outcomes: loss / zero recovery, bear / partial recovery, base and upside. Probabilities are subjective assumptions, sum to 100%, and the zero-recovery case must have positive probability. State the source or reasoning for valuation and outcome assumptions; do not invent probabilities that look statistically calibrated.
 
-If dilution is unknown, use a reasonable assumption and label it clearly as illustrative.
-If investing via an SPV/syndicate, clarify whether carry/fees are included or excluded.
+Disclose total cash outlay, deployable capital, fee rate and whether fees are deducted or added, post-money entry valuation, currency conversion, illustrative entry ownership, future dilution and exit ownership, carry rate and its capital-return basis, horizon, and excluded taxes/additional expenses. SAFE cap-based ownership is only an illustration, not a guaranteed conversion price. Exit values must represent equity value distributable to the modeled holding after the assumed debt and preference waterfall; disclose simplifications. Unknown conversion, senior claims or cost terms may make a credible model unavailable.
 
-Probabilities must sum to **100%**. Compute expected cash-out and IRR using probability-weighted averages over a simple 8-year hold. Return outputs must disclose the dilution treatment used.
+Calculate net proceeds, net MOIC and annualized return for each scenario from those inputs. With one outflow and one terminal receipt, annualized return = net MOIC^(1/years) − 1; actual intermediate cash flows require a cash-flow model. Show probability of total loss separately from probability of returning less than cash paid. Show assumption-weighted proceeds alongside their reliance on the upside case and a price sensitivity. Do not headline “expected IRR”; annualizing expected proceeds and averaging scenario annualized returns are different operations and neither is a forecast.
+
+If a personal hurdle is supplied, identify its basis. The optional `base_case_return_hurdle` profile field compares the base case's net annualized return, not an expected IRR. If no hurdle exists, identify the decision as a qualitative investment judgment and do not claim a personal hurdle was met. Leave the model unavailable when inputs cannot credibly be specified; this blocks an INVEST rather than fabricating a favourable return case.

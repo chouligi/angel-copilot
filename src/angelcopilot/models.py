@@ -40,7 +40,12 @@ class InvestorProfile:
     region: str = ""
     currency: str = ""
     inferred_risk_level: str = ""
-    ticket_typical: int = 0
+    ticket_typical: float = 0
+    ticket_min: float | None = None
+    ticket_max: float | None = None
+    evaluation_weight_overrides: dict[str, float] = field(default_factory=dict)
+    return_hurdle: float | None = None
+    remaining_angel_budget: float | None = None
     sectors_themes: list[str] = field(default_factory=list)
     geo_focus: list[str] = field(default_factory=list)
 
@@ -51,7 +56,7 @@ class AssessmentResult:
 
     deal_id: str
     company_name: str
-    category_scores: dict[str, float]
+    category_scores: dict[str, float | None]
     risk_flags: list[str]
     sectors: list[str]
     geographies: list[str]
@@ -67,10 +72,10 @@ class AssessmentResult:
     assessment_process: dict[str, object] = field(default_factory=dict)
     evidence_sources: list[str] = field(default_factory=list)
     extraction_warnings: list[str] = field(default_factory=list)
-    hypothetical_investment: float = 10000.0
-    investment_currency: str = "USD"
-    investment_basis: str = "default_10000"
-    dilution_assumption: str = "Excluded by default (gross multiples, pre-dilution assumption)."
+    hypothetical_investment: float = 0.0
+    investment_currency: str = "EUR"
+    investment_basis: str = "not_configured"
+    dilution_assumption: str = "Not recorded; do not infer dilution from narrative."
     verdict_one_liner: str = ""
     why_not_invest_now: list[str] = field(default_factory=list)
     what_would_upgrade_to_invest: list[str] = field(default_factory=list)
@@ -78,11 +83,28 @@ class AssessmentResult:
     reconciliation_gaps: list[str] = field(default_factory=list)
     fit_call: str = ""
     founder_questions: list[str] = field(default_factory=list)
-    weighted_score: float = 0.0
+    weighted_score: float | None = None
     verdict: str = ""
     attention_flag: bool = False
     attention_reason: str = ""
     profile_fit: float = 0.0
+    schema_version: int = 1
+    category_drivers: dict[str, str] = field(default_factory=dict)
+    category_confidence: dict[str, str] = field(default_factory=dict)
+    effective_weights: dict[str, float] = field(default_factory=dict)
+    score_coverage: float = 0.0
+    deal_snapshot: dict[str, str] = field(default_factory=dict)
+    decision: dict[str, object] = field(default_factory=dict)
+    diligence_issues: list[dict[str, object]] = field(default_factory=list)
+    questions: list[dict[str, object]] = field(default_factory=list)
+    return_assumptions: dict[str, object] = field(default_factory=dict)
+    return_summary: dict[str, object] = field(default_factory=dict)
+    recommended_investment: float = 0.0
+    decision_reason: str = ""
+    next_action: str = ""
+    sizing_reason: str = ""
+    decision_warnings: list[str] = field(default_factory=list)
+    investor_constraints: dict[str, object] = field(default_factory=dict)
 
     def to_json_dict(self) -> dict[str, object]:
         """Serialize the dataclass to a JSON-compatible dictionary.

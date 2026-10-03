@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import datetime
+import json
 from pathlib import Path
 
 from angelcopilot.assistant import validate_assessment_payload
@@ -18,7 +19,8 @@ from angelcopilot.preparation import (
 )
 from angelcopilot.scoring import apply_scoring_rules
 
-DEFAULT_RUNTIME_SKILL_PATH = Path.home() / ".codex" / "skills" / "angel-copilot" / "SKILL.md"
+_REPO_SKILL = Path(__file__).resolve().parents[2] / "skills/public/angel-copilot/SKILL.md"
+DEFAULT_RUNTIME_SKILL_PATH = _REPO_SKILL if _REPO_SKILL.is_file() else Path.home() / ".codex/skills/angel-copilot/SKILL.md"
 EXECUTION_MODE_SKILL_NATIVE = "skill_native"
 ProgressCallback = Callable[[str, dict[str, object]], None]
 
@@ -140,7 +142,7 @@ def run_batch_assessment(
             "See preceding deal_failed logs for assistant or payload errors."
         )
 
-    sorted_assessments = sorted(assessments, key=lambda item: item.weighted_score, reverse=True)
+    sorted_assessments = sorted(assessments, key=lambda item: ({"INVEST": 0, "WAIT": 1, "PASS": 2}.get(item.verdict, 3), -(item.weighted_score or 0)))
     _emit_progress(
         progress_callback,
         "batch_completed",
@@ -367,13 +369,19 @@ def _assess_prepared_deal(
             )
             return None
 
-        scored = _build_scored_assessment(
-            deal_id=deal.deal_id,
-            normalized_payload=normalized_payload,
-            profile=profile,
-            evidence_sources=prepared_workspace.files_used,
-            extraction_warnings=prepared_workspace.warnings,
-        )
+        try:
+            scored = _build_scored_assessment(
+                deal_id=deal.deal_id,
+                normalized_payload=normalized_payload,
+                profile=profile,
+                evidence_sources=prepared_workspace.files_used,
+                extraction_warnings=prepared_workspace.warnings,
+            )
+        except Exception as exc:  # noqa: BLE001
+            _emit_progress(progress_callback, "deal_failed", {"deal_id": deal.deal_id,
+                "index": prepared_task.index, "total": prepared_task.total,
+                "reason": "scoring_failed", "error": str(exc)})
+            return None
         _emit_progress(
             progress_callback,
             "deal_completed",
@@ -413,60 +421,13 @@ def _build_scored_assessment(
         AssessmentResult: Value returned by this function.
     """
 
-    return_scenarios = [
-        dict(item) for item in list(normalized_payload.get("return_scenarios", [])) if isinstance(item, dict)
-    ]
-    check_size = float(profile.ticket_typical) if profile.ticket_typical > 0 else 10000.0
-    investment_basis = "profile_ticket_typical" if profile.ticket_typical > 0 else "default_10000"
-
-    assessment = AssessmentResult(
-        deal_id=str(normalized_payload["deal_id"] or deal_id),
-        company_name=str(normalized_payload["company_name"]),
-        category_scores={key: float(value) for key, value in dict(normalized_payload["category_scores"]).items()},
-        risk_flags=[str(flag) for flag in list(normalized_payload["risk_flags"])],
-        sectors=[str(item) for item in list(normalized_payload["sectors"])],
-        geographies=[str(item) for item in list(normalized_payload["geographies"])],
-        rationale=str(normalized_payload["rationale"]),
-        citations=[
-            item
-            for item in list(normalized_payload.get("citations", []))
-            if isinstance(item, (str, dict))
-        ],
-        category_rationales={
-            key: str(value) for key, value in dict(normalized_payload.get("category_rationales", {})).items()
-        },
-        web_sweep_findings=[
-            item
-            for item in list(normalized_payload.get("web_sweep_findings", []))
-            if isinstance(item, (str, dict))
-        ],
-        web_sweep_sources=[
-            item
-            for item in list(normalized_payload.get("web_sweep_sources", []))
-            if isinstance(item, (str, dict))
-        ],
-        milestones_to_monitor=[str(item) for item in list(normalized_payload.get("milestones_to_monitor", []))],
-        key_unknowns=[str(item) for item in list(normalized_payload.get("key_unknowns", []))],
-        return_scenarios=return_scenarios,
-        assessment_limitations=str(normalized_payload.get("assessment_limitations", "")),
-        assessment_process=_build_all_yes_process(),
-        verdict_one_liner=str(normalized_payload.get("verdict_one_liner", "")),
-        why_not_invest_now=[str(item) for item in list(normalized_payload.get("why_not_invest_now", []))],
-        what_would_upgrade_to_invest=[
-            str(item) for item in list(normalized_payload.get("what_would_upgrade_to_invest", []))
-        ],
-        market_context=str(normalized_payload.get("market_context", "")),
-        reconciliation_gaps=[str(item) for item in list(normalized_payload.get("reconciliation_gaps", []))],
-        fit_call=str(normalized_payload.get("fit_call", "")),
-        founder_questions=[str(item) for item in list(normalized_payload.get("founder_questions", []))],
-        evidence_sources=list(evidence_sources),
-        extraction_warnings=list(extraction_warnings),
-        hypothetical_investment=check_size,
-        investment_currency=profile.currency.strip() or "USD",
-        investment_basis=investment_basis,
-        dilution_assumption=_infer_dilution_assumption(return_scenarios),
-    )
-    return apply_scoring_rules(assessment, profile)
+    allowed = {f.name for f in fields(AssessmentResult)}
+    data = {k: v for k, v in normalized_payload.items() if k in allowed}
+    data.setdefault("deal_id", deal_id)
+    for key, default in {"risk_flags": [], "sectors": [], "geographies": [], "rationale": ""}.items():
+        data.setdefault(key, default)
+    data.update(evidence_sources=list(evidence_sources), extraction_warnings=list(extraction_warnings))
+    return apply_scoring_rules(AssessmentResult(**data), profile)
 
 
 def build_skill_native_prompt(
@@ -495,8 +456,17 @@ def build_skill_native_prompt(
         "Run the skill workflow as a standalone single-deal assessment.\n"
         "Do not re-implement or summarize the skill rules in a custom rubric.\n"
         "Read files directly from the deal folder path provided.\n"
-        "Depth requirement: include substantive analysis in each category rationale, include a concise market context "
-        "synthesis, explicit reconciliation gaps, a profile fit call, and at least three founder questions.\n"
+        "Use schema_version 2. Give a personal actionable judgment at reviewed terms; never map the score to a verdict.\n"
+        "INVEST means a normal cheque now; WAIT and PASS mean no cheque recommended. Do not display a numeric zero-cheque amount. No exploratory/starter cheque language.\n"
+        "Use only the investor profile's normal ticket range. Do not source cheque sizes from rubric defaults; if the profile has no complete range, do not recommend or model a cheque.\n"
+        "Keep category drivers <=25 words and category notes about 40-70 words.\n"
+        "Rank up to five diligence issues and up to three primary founder questions by decision impact.\n"
+        "Each ask must link to an issue and request evidence when assurance would not verify the claim.\n"
+        "Route optional asks to founder, syndicate_lead, counsel or customer. Three is a ceiling, not a quota.\n"
+        "Model no follow-ons with explicit fees, carry, FX, post-money ownership and dilution.\n"
+        "Use loss/bear/base/upside scenarios with fractional probabilities summing to 1. Leave assumptions and scenarios empty if unknowable.\n"
+        "Return-assumption currency must equal the profile currency (default EUR); FX must be explicit across currencies.\n"
+        "Report missing scores as null and missing process work honestly. Do not invent executed contracts or verification.\n"
         "After completing the assessment, output strict JSON only.\n"
         f"Required JSON schema: {response_schema}\n"
         f"If the assessed company name differs from folder name, keep deal_id as '{deal_id}'.\n"
@@ -514,30 +484,30 @@ def _response_schema_template() -> str:
         str: Value returned by this function.
     """
 
-    return (
-        '{"deal_id":"...","company_name":"...","category_scores":{"Team":0,"Market":0,'
-        '"Product":0,"Traction":0,"Unit Economics":0,"Defensibility":0,"Terms":0},'
-        '"category_rationales":{"Team":"...","Market":"...","Product":"...","Traction":"...",'
-        '"Unit Economics":"...","Defensibility":"...","Terms":"..."},'
-        '"risk_flags":[],"sectors":[],"geographies":[],"rationale":"...",'
-        '"citations":[{"id":"D1","source":"...","date":"...","url":"...","note":"..."}],'
-        '"web_sweep_findings":[{"area":"...","finding":"...","reconciliation":"..."}],'
-        '"web_sweep_sources":[{"id":"W1","title":"...","url":"...","date":"...","why_relevant":"..."}],'
-        '"milestones_to_monitor":[],'
-        '"key_unknowns":[],"return_scenarios":[{"scenario":"Base","multiple":"3x",'
-        '"probability":"50%","rationale":"..."}],'
-        '"assessment_limitations":"...",'
-        '"verdict_one_liner":"...",'
-        '"why_not_invest_now":["..."],'
-        '"what_would_upgrade_to_invest":["..."],'
-        '"market_context":"...",'
-        '"reconciliation_gaps":["..."],'
-        '"fit_call":"...",'
-        '"founder_questions":["..."],'
-        '"assessment_process":{"single_deal_equivalent":"yes|partial|no","used_full_rubric":true,'
-        '"performed_web_sweep":true,"reconciled_docs_with_web":true,'
-        '"built_three_case_return_model":true,"notes":"..."}}'
-    )
+    example = {
+        "schema_version": 2, "deal_id": "...", "company_name": "...",
+        "category_scores": {k: None for k in ("Team", "Market", "Product", "Traction", "Unit Economics", "Defensibility", "Terms")},
+        "category_rationales": {k: "Evidence and judgment; identify score ceiling." for k in ("Team", "Market", "Product", "Traction", "Unit Economics", "Defensibility", "Terms")},
+        "category_drivers": {k: "Short decision driver" for k in ("Team", "Market", "Product", "Traction", "Unit Economics", "Defensibility", "Terms")},
+        "category_confidence": {k: "unknown" for k in ("Team", "Market", "Product", "Traction", "Unit Economics", "Defensibility", "Terms")},
+        "deal_snapshot": {"product": "...", "customer": "...", "stage": "...", "instrument": "...", "terms": "...", "market_timing": "..."},
+        "decision": {"verdict": "WAIT", "reason": "...", "assessment_summary": {"investment_case": "...", "supporting_evidence": "...", "counterarguments": "...", "decision_logic": "..."}, "economics": "unknown", "evidence": "incomplete", "fit": "unknown", "suggested_amount": 0,
+                     "sizing_reason": "No allocation until material evidence is resolved", "next_action": "...", "minimum_ticket": 0},
+        "diligence_issues": [{"id": "I1", "priority": 1, "status": "blocker", "evidence_state": "unknown", "title": "...", "finding": "...", "decision_impact": "...", "evidence_needed": "...", "reconsideration_condition": "...", "source_ids": ["D1"]}],
+        "questions": [{"question": "...", "priority": 1, "audience": "founder", "optional": False, "issue_id": "I1", "evidence_requested": "..."}],
+        "return_assumptions": {"currency": "EUR", "valuation_currency": "EUR", "fx_rate": 1, "entry_valuation": 20000000,
+                               "entry_valuation_basis": "post_money", "exit_value_basis": "distributable_equity", "fee_rate": .04, "fee_treatment": "deducted",
+                               "carry_rate": .20, "carry_basis": "deployed_capital", "dilution_rate": .45, "follow_on": False, "years": 8,
+                               "ownership_note": "SAFE cap-based ownership is illustrative; verify conversion and senior claims", "exclusions": "Taxes and future additional expenses excluded"},
+        "return_scenarios": [{"kind": k, "scenario": k.title(), "exit_value": v, "probability": prob, "rationale": "Company-specific outcome assumptions"}
+                             for k, v, prob in [("loss", 0, .4), ("bear", 5000000, .2), ("base", 200000000, .3), ("upside", 1000000000, .1)]],
+        "risk_flags": [], "sectors": [], "geographies": [], "rationale": "",
+        "citations": [{"id": "D1", "source": "...", "date": "YYYY-MM-DD", "note": "..."}],
+        "web_sweep_sources": [{"id": "W1", "source": "...", "date": "YYYY-MM-DD", "date_accessed": "YYYY-MM-DD", "url": "https://...", "note": "..."}],
+        "assessment_limitations": "...",
+        "assessment_process": {"used_full_rubric": True, "performed_web_sweep": True, "reconciled_docs_with_web": True, "built_return_model": True, "notes": "Actual completion only"},
+    }
+    return json.dumps(example)
 
 
 def build_default_run_id() -> str:
@@ -583,25 +553,6 @@ def _run_with_retry(runner, prompt: str, cwd: Path) -> tuple[dict[str, object] |
             return None, f"first_attempt={first_error}; retry_attempt={second_error}"
 
 
-def _build_all_yes_process() -> dict[str, object]:
-    """Default assessment-process metadata for normalized payloads.
-    
-    Args:
-        None.
-    
-    Returns:
-        dict[str, object]: Value returned by this function.
-    """
-
-    return {
-        "single_deal_equivalent": "yes",
-        "used_full_rubric": True,
-        "performed_web_sweep": True,
-        "reconciled_docs_with_web": True,
-        "built_three_case_return_model": True,
-    }
-
-
 def _infer_dilution_assumption(return_scenarios: list[dict[str, object]]) -> str:
     """Infer dilution inclusion summary from return-scenario fields.
     
@@ -626,7 +577,7 @@ def _infer_dilution_assumption(return_scenarios: list[dict[str, object]]) -> str
             observed.append(parsed)
 
     if not observed:
-        return "Excluded by default (gross multiples, pre-dilution assumption)."
+        return "Not recorded; do not infer dilution from narrative."
     if all(observed):
         return "Included."
     if not any(observed):

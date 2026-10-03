@@ -1,0 +1,2 @@
+deal_id,company_name,weighted_score,score_coverage,verdict,recommended_investment,investment_currency,decision_reason,next_action
+Stronghold-retrospective-2026-07-22,Stronghold AI (Ponteiro SAS),3.845,1.0,WAIT,,EUR,Resolve before investing: Commercial interest is not verified backlog; Independent product performance is unavailable; Production economics and cash needs are incomplete,Do not commit; review the stated blocking conditions.

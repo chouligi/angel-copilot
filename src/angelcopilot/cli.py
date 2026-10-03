@@ -178,21 +178,7 @@ def _rerender_report(args: argparse.Namespace) -> int:
     if args.recompute_scoring:
         profile_path = Path(args.profile).expanduser().resolve()
         profile = load_investor_profile(profile_path)
-        check_size = float(profile.ticket_typical) if profile.ticket_typical > 0 else 10000.0
-        investment_basis = "profile_ticket_typical" if profile.ticket_typical > 0 else "default_10000"
-        currency = profile.currency.strip() or "USD"
-
-        refreshed: list = []
-        for assessment in assessments:
-            updated = replace(
-                assessment,
-                hypothetical_investment=check_size,
-                investment_currency=currency,
-                investment_basis=investment_basis,
-                dilution_assumption=_infer_dilution_assumption(assessment.return_scenarios),
-            )
-            refreshed.append(apply_scoring_rules(updated, profile))
-        assessments = refreshed
+        assessments = [apply_scoring_rules(assessment, profile) for assessment in assessments]
 
     output_paths = write_batch_outputs(
         assessments=assessments,

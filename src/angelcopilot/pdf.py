@@ -49,6 +49,12 @@ def _render_with_python_playwright(input_html: Path, output_pdf: Path) -> None:
             path=str(output_pdf),
             format="A4",
             print_background=True,
-            margin={"top": "16mm", "right": "12mm", "bottom": "16mm", "left": "12mm"},
+            margin={"top": "17mm", "right": "14mm", "bottom": "18mm", "left": "14mm"},
+            prefer_css_page_size=True,
+            tagged=True,
+            outline=True,
+            display_header_footer=True,
+            header_template="<div style='font-size:8px;color:#667085;width:100%;padding:0 14mm'>AngelCopilot · Investment Decisions</div>",
+            footer_template="<div style='font-size:8px;color:#667085;width:100%;text-align:right;padding:0 14mm'>Page <span class='pageNumber'></span> of <span class='totalPages'></span></div>",
         )
         browser.close()

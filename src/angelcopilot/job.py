@@ -209,7 +209,7 @@ def _build_progress_callback(
         if event == "deal_completed":
             logger(
                 f"{prefix} [{payload.get('index')}/{payload.get('total')}] "
-                f"done '{payload.get('deal_id')}' score={float(payload.get('weighted_score', 0.0)):.2f} "
+                f"done '{payload.get('deal_id')}' score={float(payload.get('weighted_score') or 0.0):.2f} "
                 f"verdict={payload.get('verdict')}"
             )
             return
