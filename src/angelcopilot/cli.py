@@ -278,7 +278,7 @@ def _build_parser() -> argparse.ArgumentParser:
     execution_group.add_argument(
         "--assistant-model",
         default=None,
-        help="Optional model override for Codex, for example gpt-5.5. Omit to use Codex config.",
+        help="Optional Codex model override (batch run defaults to gpt-6-luna).",
     )
     execution_group.add_argument(
         "--skill-path",

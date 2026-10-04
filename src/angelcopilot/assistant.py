@@ -543,6 +543,7 @@ def _build_codex_exec_command(cwd: Path, model: str | None = None) -> list[str]:
     normalized_model = _normalize_optional_text(model)
     if normalized_model:
         command.extend(["--model", normalized_model])
+    command.extend(["-c", "model_reasoning_effort=medium"])
     command.extend(["--skip-git-repo-check", "-C", str(cwd), "-"])
     return command
 

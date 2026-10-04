@@ -76,17 +76,20 @@ def run_batch_job(
     resolved_output_dir = Path(out).expanduser().resolve()
     resolved_skill_path = Path(skill_path).expanduser().resolve()
     resolved_cwd = Path(cwd).expanduser().resolve() if cwd is not None else Path.cwd()
+    effective_assistant_model = assistant_model
+    if assistant == "codex" and not _normalize_optional_text(effective_assistant_model):
+        effective_assistant_model = "gpt-6-luna"
 
     profile = load_investor_profile(resolved_profile_path)
-    effective_runner = runner or build_assistant_runner(assistant, model=assistant_model)
+    effective_runner = runner or build_assistant_runner(assistant, model=effective_assistant_model)
     intake_classifier = None
     if intake_filter == "smart":
         try:
-            intake_classifier = build_intake_classifier(assistant, cwd=resolved_cwd, model=assistant_model)
+            intake_classifier = build_intake_classifier(assistant, cwd=resolved_cwd, model=effective_assistant_model)
         except RuntimeError:
             intake_classifier = None
     log = logger or _default_logger
-    assistant_model_label = _resolve_assistant_model_label(assistant=assistant, assistant_model=assistant_model)
+    assistant_model_label = _resolve_assistant_model_label(assistant=assistant, assistant_model=effective_assistant_model)
 
     assessments = run_batch_assessment(
         deals_root=resolved_deals_root,
