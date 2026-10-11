@@ -256,7 +256,7 @@ def test_reports_share_opening_labels_attention_and_roundtrip(tmp_path, monkeypa
     assert 'Confidence' not in md and 'Conditional investment view' not in md
     assert a.screening['next_action'] in md and a.screening['next_action'] in html
     with paths.csv_path.open() as handle: row = next(csv.DictReader(handle))
-    assert row['pursuit_recommendation']=='PURSUE' and row['attention_flag']=='True'
+    assert row['recommendation']=='PURSUE' and row['attention_flag']=='True'
     assert row['recommended_investment']==''
     loaded = load_assessments_from_json(paths.json_path)[0]
     assert loaded.deal_snapshot['company_summary'] == summary
@@ -265,12 +265,15 @@ def test_reports_share_opening_labels_attention_and_roundtrip(tmp_path, monkeypa
     assert json.loads(paths.json_path.read_text())['schema_version'] == 3
 
 
-def test_new_schema_requires_screening_and_resolution_fields():
+def test_current_schema_requires_unified_action_and_resolution_fields():
     schema = assessment_response_schema()
-    assert schema['properties']['schema_version']['enum'] == [3]
-    assert {'assessment_mode','screening','economic_ranges'} <= set(schema['required'])
+    assert schema['properties']['schema_version']['enum'] == [4]
+    assert 'economic_ranges' in schema['required']
+    assert 'assessment_mode' not in schema['required']
+    assert 'screening' not in schema['required']
     assert 'company_summary' in schema['properties']['deal_snapshot']['required']
     assert {'resolution_type','resolution_horizon'} <= set(schema['properties']['diligence_issues']['items']['required'])
+    assert {'PURSUE', 'WAIT'} <= set(schema['properties']['decision']['properties']['verdict']['enum'])
 
 
 def test_saved_assessment_without_summary_uses_recorded_description(tmp_path):
@@ -308,21 +311,21 @@ def test_priority_combinations_match_documented_meanings(recommendation, priorit
         validate_assessment_payload(revised(recommendation=recommendation, priority=priority).to_json_dict())
 
 
-def test_mode_mismatch_retries_instead_of_authorizing_unrequested_commitment(tmp_path):
+def test_batch_retry_requires_current_v4_assessment_schema(tmp_path):
     from angelcopilot.pipeline import _run_with_retry
     calls = []
     class Runner:
         def run_assessment(self, prompt, cwd):
             calls.append(prompt)
-            return revised(mode='commitment').to_json_dict()
-    payload, error = _run_with_retry(Runner(), 'screen this opportunity', tmp_path, requested_mode='screening')
-    assert payload is None and len(calls) == 3
-    assert 'must match requested mode screening' in error
-    assert 'assessment_mode must match' in calls[1]
+            return {'schema_version': 3 if len(calls) == 1 else 4}
+    payload, error = _run_with_retry(Runner(), 'assess this opportunity', tmp_path)
+    assert payload == {'schema_version': 4} and error is None and len(calls) == 2
+    assert 'received 3' in calls[1]
 
 
-def test_batch_job_can_explicitly_request_completed_diligence_commitment(tmp_path):
+def test_batch_job_runs_unified_assessment_without_mode_selector(tmp_path):
     from angelcopilot.job import run_batch_job
+    from tests.assessment_payloads import as_v4
     deal = tmp_path/'deals'/'harborops'; deal.mkdir(parents=True)
     (deal/'memo.md').write_text('Fictional completed diligence supplied for an explicit commitment review.')
     profile = tmp_path/'profile.md'
@@ -331,23 +334,18 @@ def test_batch_job_can_explicitly_request_completed_diligence_commitment(tmp_pat
     class Runner:
         def run_assessment(self, prompt, cwd):
             calls.append(prompt)
-            assert 'Requested assessment mode: commitment.' in prompt
-            return revised(mode='commitment').to_json_dict()
+            return as_v4(modern().to_json_dict())
     result = run_batch_job(deals_root=deal.parent, profile_path=profile, out=tmp_path/'reports',
                            intake_filter='rules', top_level_containers=False, include_pdf=False,
-                           runner=Runner(), assessment_mode='commitment', logger=lambda _: None)
+                           runner=Runner(), logger=lambda _: None)
     assert len(calls) == 1
-    assert result.assessments[0].verdict == 'INVEST'
-    assert result.assessments[0].commitment_readiness == 'Ready to commit'
-    assert 'INVEST' in result.output_paths.markdown_path.read_text()
+    assert 'schema_version 4' in calls[0]
+    assert result.assessments[0].schema_version == 4
+    assert result.assessments[0].verdict == 'WAIT'
+    assert 'WAIT' in result.output_paths.markdown_path.read_text()
 
 
-def test_cli_passes_explicit_assessment_mode_to_job(monkeypatch):
-    from types import SimpleNamespace
+def test_cli_rejects_removed_assessment_mode_selector():
     from angelcopilot import cli
-    observed = {}
-    def job(**kwargs):
-        observed.update(kwargs); return SimpleNamespace(assessments=[])
-    monkeypatch.setattr(cli, 'run_batch_job', job)
-    assert cli.main(['batch','run','--deals-root','/tmp/deals','--assessment-mode','commitment','--no-pdf']) == 0
-    assert observed['assessment_mode'] == 'commitment'
+    with pytest.raises(SystemExit):
+        cli.main(['batch','run','--deals-root','/tmp/deals','--assessment-mode','commitment','--no-pdf'])

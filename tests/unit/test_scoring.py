@@ -130,7 +130,9 @@ def test_no_return_case_means_no_invest():
 
 
 def test_gated_decision_regeneration_is_idempotent_and_preserves_proposal():
-    a=modern();a.diligence_issues[0]['status']='blocker'
+    a=modern();a.schema_version=3;a.assessment_mode='commitment'
+    a.screening={'recommendation':'PURSUE','priority':'high','reason':'Targeted diligence is justified.','next_action':'Verify the material claims.'}
+    a.diligence_issues[0]['status']='blocker'
     first=apply_scoring_rules(a,investor())
     second=apply_scoring_rules(first,investor())
     assert first.verdict==second.verdict=='WAIT'

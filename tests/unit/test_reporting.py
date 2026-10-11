@@ -50,7 +50,7 @@ def test_weighted_score_is_visible_in_overview_and_individual_assessment(tmp_pat
     assert f'Score coverage: {coverage_text}' in html
     overview = html.split('<nav>')[0]
     assert 'Weighted score / 5' in overview
-    assert '>Coverage</th>' not in overview
+    assert '>Coverage</th>' in overview
     assert f"><strong>{score_text}</strong></td>" in overview
     overview_header_cells = overview.count('<th>')
     first_row = overview.split('<tbody>', 1)[1].split('</tr>', 1)[0]

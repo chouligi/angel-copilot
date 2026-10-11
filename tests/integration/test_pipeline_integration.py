@@ -9,13 +9,14 @@ from angelcopilot.models import InvestorProfile
 from angelcopilot.assistant import validate_assessment_payload
 from angelcopilot.pipeline import build_skill_native_prompt, run_batch_assessment
 from angelcopilot.reporting import write_batch_outputs
+from tests.assessment_payloads import as_v4
 
 
 class FakeRunner:
     def run_assessment(self, prompt: str, cwd: Path) -> dict[str, object]:
         del prompt
         del cwd
-        return {
+        return as_v4({
             "deal_id": "deal_a",
             "company_name": "Deal A",
             "category_scores": {
@@ -62,7 +63,7 @@ class FakeRunner:
                 "built_three_case_return_model": True,
                 "notes": "Fixture confirms end-to-end path.",
             },
-        }
+        })
 
 
 class CapturingRunner:
@@ -148,6 +149,7 @@ class ShortSummaryMalformedRunner:
             "id": "I1", "priority": 1, "status": "critical", "evidence_state": "unverified",
             "title": "Evidence gap", "finding": "The claim is not supported.",
             "decision_impact": "It limits the current decision.",
+            "resolution_type": "document", "resolution_horizon": "During initial diligence",
         }]
         payload["questions"] = [{
             "question": "Please provide the underlying source documents and walk through every material assumption "
@@ -167,23 +169,24 @@ def _modern_payload() -> dict[str, object]:
         "It describes what is known, what remains uncertain, and why the current decision follows from evidence. " \
         "The test does not contact external services and exists to verify the assessment repair boundary."
     return {
-        "schema_version": 2,
+        "schema_version": 4,
         "deal_id": "deal_a",
         "company_name": "Deal A",
         "category_scores": {key: None for key in categories},
         "category_rationales": {key: "Evidence is not available in this synthetic test." for key in categories},
         "category_drivers": {key: "Insufficient evidence to support a score." for key in categories},
         "category_confidence": {key: "unknown" for key in categories},
-        "deal_snapshot": {key: "Unknown" for key in ("product", "customer", "stage", "instrument", "terms", "market_timing")},
+        "deal_snapshot": {"company_summary": "Synthetic company fixture.", **{key: "Unknown" for key in ("product", "customer", "stage", "instrument", "terms", "market_timing")}},
         "decision": {
-            "verdict": "WAIT", "reason": "Evidence is insufficient.", "next_action": "Gather evidence.",
+            "verdict": "WAIT", "priority": "medium", "reason": "Evidence is insufficient.", "next_action": "Gather evidence.",
             "sizing_reason": "No cheque until evidence is sufficient.", "economics": "unknown",
             "evidence": "incomplete", "fit": "unknown", "suggested_amount": 0,
+            "minimum_ticket": 0,
             "assessment_summary": {key: summary for key in (
                 "investment_case", "supporting_evidence", "counterarguments", "decision_logic"
             )},
         },
-        "diligence_issues": [], "questions": [], "return_assumptions": {}, "return_scenarios": [],
+        "economic_ranges": {}, "diligence_issues": [], "questions": [], "return_assumptions": {}, "return_scenarios": [],
         "risk_flags": [], "sectors": [], "geographies": [], "rationale": "Synthetic integration fixture.",
         "citations": [], "web_sweep_sources": [], "assessment_limitations": "Synthetic test only.",
         "assessment_process": {
@@ -204,7 +207,7 @@ class ThreadTrackingRunner:
         deal_id = deal_id_match.group(1).strip() if deal_id_match else "unknown"
         with self.lock:
             self.thread_ids.add(threading.get_ident())
-        return {
+        return as_v4({
             "deal_id": deal_id,
             "company_name": deal_id.replace("_", " ").title(),
             "category_scores": {
@@ -247,7 +250,7 @@ class ThreadTrackingRunner:
                 "reconciled_docs_with_web": True,
                 "built_three_case_return_model": True,
             },
-        }
+        })
 
 
 def test_run_batch_assessment__processes_recent_deals_end_to_end(tmp_path: Path) -> None:

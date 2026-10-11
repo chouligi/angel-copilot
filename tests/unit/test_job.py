@@ -3,13 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 
 from angelcopilot.job import run_batch_job
+from tests.assessment_payloads import as_v4
 
 
 class FakeRunner:
     def run_assessment(self, prompt: str, cwd: Path) -> dict[str, object]:
         del prompt
         del cwd
-        return {
+        return as_v4({
             "deal_id": "deal_a",
             "company_name": "Deal A",
             "category_scores": {
@@ -56,7 +57,7 @@ class FakeRunner:
                 "built_three_case_return_model": True,
                 "notes": "Fixture confirms end-to-end path.",
             },
-        }
+        })
 
 
 def test_run_batch_job__logs_progress_and_writes_outputs(tmp_path: Path) -> None:

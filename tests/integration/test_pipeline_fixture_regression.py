@@ -5,6 +5,7 @@ import re
 
 from angelcopilot.models import InvestorProfile
 from angelcopilot.pipeline import run_batch_assessment
+from tests.assessment_payloads import as_v4
 
 
 class FixtureRunner:
@@ -22,7 +23,7 @@ class FixtureRunner:
             geography = ["Europe"]
             score_base = 4.25
 
-        return {
+        return as_v4({
             "deal_id": deal_id,
             "company_name": deal_id.replace("_", " ").title(),
             "category_scores": {
@@ -80,7 +81,7 @@ class FixtureRunner:
                 "reconciled_docs_with_web": True,
                 "built_three_case_return_model": True,
             },
-        }
+        })
 
 
 def test_run_batch_assessment__processes_fixture_deals_without_prod_docs(deals_fixtures_root: Path) -> None:
