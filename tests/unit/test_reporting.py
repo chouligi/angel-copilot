@@ -18,6 +18,47 @@ def test_export_roundtrip_retains_decision_constraints_and_process(tmp_path):
     assert json.loads(result.json_path.read_text())['assessments']==json.loads(second.json_path.read_text())['assessments']
 
 
+def test_export_deduplicates_assessment_quality_notes(tmp_path):
+    a = modern(1)
+    a.assessment_quality_warnings = ['Long summary.', 'Long summary.', None]
+    result = write_batch_outputs([a], tmp_path, 'run')
+    loaded = load_assessments_from_json(result.json_path)
+    assert loaded[0].assessment_quality_warnings == ['Long summary.']
+
+
+def test_weighted_score_is_visible_in_overview_and_individual_assessment(tmp_path):
+    a = modern(0)
+    result = write_batch_outputs([a], tmp_path, 'run')
+    markdown = result.markdown_path.read_text()
+    html = result.html_path.read_text()
+    saved = json.loads(result.json_path.read_text())['assessments'][0]
+    score_text = f"{saved['weighted_score']:.1f} / 5"
+    coverage_text = f"{saved['score_coverage']:.0%}"
+    assert 'Weighted score / 5' in markdown
+    assert '| Coverage |' in markdown.split('## Individual Assessments')[0]
+    assert f'| **{score_text}** |' in markdown
+    overview_lines = markdown.split('## Individual Assessments')[0].splitlines()
+    table_start = next(index for index, line in enumerate(overview_lines) if line.startswith('| Company |'))
+    header_cells = overview_lines[table_start].count('|') - 1
+    data_cells = overview_lines[table_start + 2].count('|') - 1
+    assert data_cells == header_cells
+    assert f'**Weighted score: {score_text}**' in markdown
+    assert f'Score coverage: {coverage_text}' in markdown
+    assert '**Weighted score:' in markdown
+    assert '<div class=\'score-summary\'>' in html
+    assert f"<strong class='score-value'>{score_text}</strong>" in html
+    assert f'Score coverage: {coverage_text}' in html
+    overview = html.split('<nav>')[0]
+    assert 'Weighted score / 5' in overview
+    assert '>Coverage</th>' not in overview
+    assert f"><strong>{score_text}</strong></td>" in overview
+    overview_header_cells = overview.count('<th>')
+    first_row = overview.split('<tbody>', 1)[1].split('</tr>', 1)[0]
+    assert first_row.count('<td') == overview_header_cells
+    assert f"<strong class='score-value'>{score_text}</strong>" in html
+    assert f'Score coverage: {coverage_text}' in html
+
+
 def test_three_primary_questions_and_optional_audience_routing(tmp_path):
     result=write_batch_outputs([modern(1)],tmp_path,'run')
     text=result.markdown_path.read_text()
@@ -48,14 +89,18 @@ def test_wait_with_available_return_model_still_has_no_recommended_amount(tmp_pa
     result=write_batch_outputs([a],tmp_path,'run')
     text=result.markdown_path.read_text()
     main=text.split('## Evidence Appendix')[0]
-    assert '| WAIT | No cheque |' in main
+    assert 'WAIT · No cheque recommended' in main
+    assert 'Not assessed' in main
     assert 'recommended allocation: No cheque recommended' in main
     assert 'recommended allocation: EUR 0' not in main
 
 
-def test_four_primary_questions_are_rejected(tmp_path):
+def test_four_primary_questions_move_lower_priority_to_optional(tmp_path):
     a=modern(1);a.questions.append(dict(a.questions[0],priority=5))
-    with pytest.raises(ValueError,match='three'):write_batch_outputs([a],tmp_path,'run')
+    paths=write_batch_outputs([a],tmp_path,'run')
+    loaded=load_assessments_from_json(paths.json_path)[0]
+    assert sum(q['optional'] is False for q in loaded.questions) == 3
+    assert any('three' in note for note in loaded.assessment_quality_warnings)
 
 
 def test_requested_pdf_failure_is_not_silently_success(tmp_path,monkeypatch):

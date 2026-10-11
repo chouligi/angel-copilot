@@ -104,7 +104,17 @@ class AssessmentResult:
     next_action: str = ""
     sizing_reason: str = ""
     decision_warnings: list[str] = field(default_factory=list)
+    assessment_quality_warnings: list[str] = field(default_factory=list)
     investor_constraints: dict[str, object] = field(default_factory=dict)
+    assessment_mode: str = "unified"
+    screening: dict[str, object] = field(default_factory=dict)
+    pursuit_recommendation: str = ""
+    pursuit_priority: str = ""
+    pursuit_reason: str = ""
+    commitment_readiness: str = "Cannot assess readiness"
+    readiness_reason: str = ""
+    economic_ranges: dict[str, object] = field(default_factory=dict)
+    economic_sensitivity: dict[str, object] = field(default_factory=dict)
 
     def to_json_dict(self) -> dict[str, object]:
         """Serialize the dataclass to a JSON-compatible dictionary.
@@ -116,7 +126,14 @@ class AssessmentResult:
             dict[str, object]: Value returned by this function.
         """
 
-        return asdict(self)
+        payload = asdict(self)
+        if self.schema_version == 4:
+            for legacy_field in (
+                "assessment_mode", "screening", "pursuit_recommendation", "pursuit_priority",
+                "pursuit_reason", "commitment_readiness", "readiness_reason",
+            ):
+                payload.pop(legacy_field, None)
+        return payload
 
 
 @dataclass

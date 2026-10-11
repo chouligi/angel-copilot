@@ -15,6 +15,60 @@ from angelcopilot.assistant import (
     parse_assessment_json,
     validate_assessment_payload,
 )
+from angelcopilot.contract import assessment_response_schema
+from angelcopilot.pipeline import _response_schema_template
+
+
+def _assert_schema_shape(schema: dict[str, object], value: object) -> None:
+    alternatives = schema.get("anyOf")
+    if isinstance(alternatives, list):
+        failures = []
+        for alternative in alternatives:
+            try:
+                _assert_schema_shape(alternative, value)
+                return
+            except AssertionError as exc:
+                failures.append(str(exc))
+        raise AssertionError(f"Value matches no schema alternative: {failures}")
+
+    schema_type = schema.get("type")
+    if schema_type == "object":
+        assert isinstance(value, dict)
+        properties = schema.get("properties", {})
+        assert isinstance(properties, dict)
+        required = schema.get("required", [])
+        assert isinstance(required, list)
+        assert set(required) <= set(value)
+        if schema.get("additionalProperties") is False:
+            assert set(value) <= set(properties)
+        for key, item in value.items():
+            if key in properties:
+                _assert_schema_shape(properties[key], item)
+    elif schema_type == "array":
+        assert isinstance(value, list)
+        item_schema = schema["items"]
+        for item in value:
+            _assert_schema_shape(item_schema, item)
+    elif schema_type == "string":
+        assert isinstance(value, str)
+    elif schema_type == "number":
+        assert isinstance(value, (int, float)) and not isinstance(value, bool)
+    elif schema_type == "integer":
+        assert isinstance(value, int) and not isinstance(value, bool)
+    elif schema_type == "boolean":
+        assert isinstance(value, bool)
+    elif schema_type == "null":
+        assert value is None
+    elif isinstance(schema_type, list):
+        assert (value is None and "null" in schema_type) or (
+            isinstance(value, (int, float)) and not isinstance(value, bool) and "number" in schema_type
+        )
+
+
+def test_response_schema__accepts_its_prompt_example_structure() -> None:
+    example = json.loads(_response_schema_template())
+
+    _assert_schema_shape(assessment_response_schema(), example)
 
 
 def test_parse_assessment_json__extracts_embedded_json() -> None:
@@ -60,6 +114,10 @@ def test_codex_runner__builds_expected_command(monkeypatch: pytest.MonkeyPatch, 
 
     def fake_run(*args: object, **kwargs: object) -> object:
         observed["cmd"] = args[0]
+        command = args[0]
+        assert isinstance(command, list)
+        schema_index = command.index("--output-schema")
+        observed["schema"] = json.loads(Path(command[schema_index + 1]).read_text(encoding="utf-8"))
         observed["input"] = kwargs.get("input")
         class Result:
             stdout = json.dumps(
@@ -131,6 +189,13 @@ def test_codex_runner__builds_expected_command(monkeypatch: pytest.MonkeyPatch, 
     assert observed["input"] == "prompt text"
     assert result["deal_id"] == "d1"
     assert result["verdict_one_liner"] == "Strong team but early traction."
+    schema = observed["schema"]
+    assert isinstance(schema, dict)
+    decision_schema = schema["properties"]["decision"]["properties"]
+    assert decision_schema["suggested_amount"]["type"] == "number"
+    assert decision_schema["fit"]["enum"] == ["compatible", "incompatible", "unknown"]
+    issue_schema = schema["properties"]["diligence_issues"]["items"]["properties"]
+    assert issue_schema["evidence_state"]["enum"] == ["verified", "reported", "unknown", "conflicting"]
 
 
 def test_codex_runner__adds_model_override_when_configured(
@@ -195,13 +260,14 @@ def test_codex_runner__adds_model_override_when_configured(
         return Result()
 
     monkeypatch.setattr("subprocess.run", fake_run)
-    runner = CodexRunner(model=" gpt-5.5 ")
+    runner = CodexRunner(model=" gpt-5.5 ", reasoning_effort="low")
 
     runner.run_assessment("prompt text", cwd=tmp_path)
 
     cmd = observed["cmd"]
     assert isinstance(cmd, list)
     assert cmd[:5] == ["codex", "--search", "exec", "--model", "gpt-5.5"]
+    assert "model_reasoning_effort=low" in cmd
 
 
 def test_build_assistant_runner__raises_when_binary_missing(monkeypatch: pytest.MonkeyPatch) -> None:

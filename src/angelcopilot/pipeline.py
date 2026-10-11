@@ -17,7 +17,7 @@ from angelcopilot.preparation import (
     cleanup_prepared_workspace,
     prepare_deal_workspace,
 )
-from angelcopilot.scoring import apply_scoring_rules
+from angelcopilot.scoring import apply_scoring_rules, assessment_sort_key
 
 _REPO_SKILL = Path(__file__).resolve().parents[2] / "skills/public/angel-copilot/SKILL.md"
 DEFAULT_RUNTIME_SKILL_PATH = _REPO_SKILL if _REPO_SKILL.is_file() else Path.home() / ".codex/skills/angel-copilot/SKILL.md"
@@ -69,7 +69,7 @@ def run_batch_assessment(
         parallelism: Number of concurrent deal workers.
 
     Returns:
-        Scored assessments sorted by descending weighted score.
+        Assessments ranked by recommended action, evidence strength and score.
     """
 
     if execution_mode != EXECUTION_MODE_SKILL_NATIVE:
@@ -142,7 +142,7 @@ def run_batch_assessment(
             "See preceding deal_failed logs for assistant or payload errors."
         )
 
-    sorted_assessments = sorted(assessments, key=lambda item: ({"INVEST": 0, "WAIT": 1, "PASS": 2}.get(item.verdict, 3), -(item.weighted_score or 0)))
+    sorted_assessments = sorted(assessments, key=assessment_sort_key)
     _emit_progress(
         progress_callback,
         "batch_completed",
@@ -393,6 +393,8 @@ def _assess_prepared_deal(
                 "files_used": len(prepared_workspace.files_used),
                 "weighted_score": scored.weighted_score,
                 "verdict": scored.verdict,
+                "recommendation": scored.verdict,
+                "priority": scored.pursuit_priority,
                 "attention_flag": scored.attention_flag,
             },
         )
@@ -456,9 +458,14 @@ def build_skill_native_prompt(
         "Run the skill workflow as a standalone single-deal assessment.\n"
         "Do not re-implement or summarize the skill rules in a custom rubric.\n"
         "Read files directly from the deal folder path provided.\n"
-        "Use schema_version 2. Give a personal actionable judgment at reviewed terms; never map the score to a verdict.\n"
-        "INVEST means a normal cheque now; WAIT and PASS mean no cheque recommended. Do not display a numeric zero-cheque amount. No exploratory/starter cheque language.\n"
-        "Use only the investor profile's normal ticket range. Do not source cheque sizes from rubric defaults; if the profile has no complete range, do not recommend or model a cheque.\n"
+        "Write deal_snapshot.company_summary as one plain-language paragraph explaining what the company does: the product, customer, problem, how it works, revenue model and current product status where supported by the documents. Attribute reported claims and cite sources. State material gaps without inventing details; keep investment judgments in assessment_summary.\n"
+        "Use schema_version 4 and give exactly one action recommendation in decision.verdict: INVEST, PURSUE, WAIT or PASS. INVEST means a normal cheque now after all commitment checks pass. PURSUE means prioritize diligence now but no cheque yet; it requires a weighted score of at least 3.5/5 and a specific reason to spend diligence time. WAIT means do not prioritize diligence now; name the evidence, milestone or event that would justify reopening. PASS means stop work at these terms or for this investor. Do not use WAIT as a synonym for incomplete diligence when the deal is worth pursuing.\n"
+        "Set decision.priority to high for INVEST, high or medium for PURSUE, any level for WAIT, and low for PASS.\n"
+        "INVEST requires sufficient stage-appropriate evidence, attractive net economics supported by a return summary or sensitivity, compatible investor constraints, and a justified cheque within the profile's permitted range, subscription minimum and known budget. Apply any configured base-case return hurdle. Fatal issues, unattractive economics or incompatible fit mean PASS. Resolve investment-critical blockers and hard risks before INVEST; if the opportunity merits resolving them, recommend PURSUE. Missing private evidence, a personal cheque range or a probability return model does not automatically lower the score or make a deal WAIT. Distinguish verification work, accepted venture risk and future business milestones; every issue needs resolution_type and resolution_horizon. Ordinary unsigned investor subscription paperwork is not itself a blocker.\n"
+        "Score all seven factors provisionally when the available evidence, stage and business model give a reasonable basis. Early deal materials are expected to be incomplete: do not leave a score null solely because diligence metrics are absent, and do not assign an arbitrary low score for missing disclosure. Use the business model and stage-appropriate signals, state assumptions and what could change the rating, and set evidence strength low when support is mostly reported or incomplete. Lower a score only for a substantive risk supported by evidence or the business model. Reserve evidence strength unknown and a null score for the rare case with no responsible basis for any provisional judgment. Evidence strength is separate from company quality.\n"
+        "The JSON template's example values are structural placeholders, not assessment defaults. Replace its null score placeholders with provisional numeric judgments wherever the factor can be assessed from the stage, business model or available evidence.\n"
+        "Use economic_ranges for exit-value sensitivities without a cheque or probabilities when supportable; use {} when unsupported. Distinguish reported terms from assumptions. Do not add a conditional investment view.\n"
+        "For INVEST, provide a positive cheque amount within the complete investor profile range. For PURSUE, WAIT and PASS, suggested_amount must be numeric 0 and no cheque is recommended. Do not display a numeric zero-cheque amount. No exploratory/starter cheque language. Explain justified departures from the typical ticket within the permitted range.\n"
         "Keep category drivers <=25 words and category notes about 40-70 words.\n"
         "Rank up to five diligence issues and up to three primary founder questions by decision impact.\n"
         "Each ask must link to an issue and request evidence when assurance would not verify the claim.\n"
@@ -466,7 +473,18 @@ def build_skill_native_prompt(
         "Model no follow-ons with explicit fees, carry, FX, post-money ownership and dilution.\n"
         "Use loss/bear/base/upside scenarios with fractional probabilities summing to 1. Leave assumptions and scenarios empty if unknowable.\n"
         "Return-assumption currency must equal the profile currency (default EUR); FX must be explicit across currencies.\n"
-        "Report missing scores as null and missing process work honestly. Do not invent executed contracts or verification.\n"
+        "Report a null score only for a genuinely unassessable factor, and explain the reason. Report missing process work honestly. Do not invent executed contracts or verification.\n"
+        "Decision enum contract: decision.economics must be exactly one of `attractive`, `unattractive`, `unknown`; "
+        "decision.fit must be exactly one of `compatible`, `incompatible`, `unknown`; "
+        "decision.evidence must be exactly `sufficient` or `incomplete`. These fields are classifications, "
+        "not prose. Never put a sentence or a category name in these fields.\n"
+        "decision.suggested_amount must be a JSON number, never text. For PURSUE, WAIT or PASS it must be numeric 0; "
+        "for INVEST it must be a positive number within the profile's allowed ticket range.\n"
+        "Each diligence issue status must be exactly fatal/blocker/risk/resolved and evidence_state must be "
+        "exactly verified/reported/unknown/conflicting. Do not use other synonyms.\n"
+        "The four decision.assessment_summary fields must each contain 25–80 words and total 140–260 words.\n"
+        "return_assumptions must always be a JSON object. Use {} when return scenarios cannot be modeled; "
+        "never use a string, array, or null for it. If assumptions are provided, return_scenarios must also be provided.\n"
         "After completing the assessment, output strict JSON only.\n"
         f"Required JSON schema: {response_schema}\n"
         f"If the assessed company name differs from folder name, keep deal_id as '{deal_id}'.\n"
@@ -485,15 +503,16 @@ def _response_schema_template() -> str:
     """
 
     example = {
-        "schema_version": 2, "deal_id": "...", "company_name": "...",
+        "schema_version": 4,
+        "economic_ranges": {}, "deal_id": "...", "company_name": "...",
         "category_scores": {k: None for k in ("Team", "Market", "Product", "Traction", "Unit Economics", "Defensibility", "Terms")},
         "category_rationales": {k: "Evidence and judgment; identify score ceiling." for k in ("Team", "Market", "Product", "Traction", "Unit Economics", "Defensibility", "Terms")},
         "category_drivers": {k: "Short decision driver" for k in ("Team", "Market", "Product", "Traction", "Unit Economics", "Defensibility", "Terms")},
         "category_confidence": {k: "unknown" for k in ("Team", "Market", "Product", "Traction", "Unit Economics", "Defensibility", "Terms")},
-        "deal_snapshot": {"product": "...", "customer": "...", "stage": "...", "instrument": "...", "terms": "...", "market_timing": "..."},
-        "decision": {"verdict": "WAIT", "reason": "...", "assessment_summary": {"investment_case": "...", "supporting_evidence": "...", "counterarguments": "...", "decision_logic": "..."}, "economics": "unknown", "evidence": "incomplete", "fit": "unknown", "suggested_amount": 0,
+        "deal_snapshot": {"company_summary": "...", "product": "...", "customer": "...", "stage": "...", "instrument": "...", "terms": "...", "market_timing": "..."},
+        "decision": {"verdict": "WAIT", "priority": "medium", "reason": "...", "assessment_summary": {"investment_case": "...", "supporting_evidence": "...", "counterarguments": "...", "decision_logic": "..."}, "economics": "unknown", "evidence": "incomplete", "fit": "unknown", "suggested_amount": 0,
                      "sizing_reason": "No allocation until material evidence is resolved", "next_action": "...", "minimum_ticket": 0},
-        "diligence_issues": [{"id": "I1", "priority": 1, "status": "blocker", "evidence_state": "unknown", "title": "...", "finding": "...", "decision_impact": "...", "evidence_needed": "...", "reconsideration_condition": "...", "source_ids": ["D1"]}],
+        "diligence_issues": [{"id": "I1", "priority": 1, "status": "blocker", "evidence_state": "unknown", "title": "...", "finding": "...", "decision_impact": "...", "evidence_needed": "...", "reconsideration_condition": "...", "source_ids": ["D1"], "resolution_type": "document", "resolution_horizon": "During initial diligence"}],
         "questions": [{"question": "...", "priority": 1, "audience": "founder", "optional": False, "issue_id": "I1", "evidence_requested": "..."}],
         "return_assumptions": {"currency": "EUR", "valuation_currency": "EUR", "fx_rate": 1, "entry_valuation": 20000000,
                                "entry_valuation_basis": "post_money", "exit_value_basis": "distributable_equity", "fee_rate": .04, "fee_treatment": "deducted",
@@ -502,8 +521,9 @@ def _response_schema_template() -> str:
         "return_scenarios": [{"kind": k, "scenario": k.title(), "exit_value": v, "probability": prob, "rationale": "Company-specific outcome assumptions"}
                              for k, v, prob in [("loss", 0, .4), ("bear", 5000000, .2), ("base", 200000000, .3), ("upside", 1000000000, .1)]],
         "risk_flags": [], "sectors": [], "geographies": [], "rationale": "",
-        "citations": [{"id": "D1", "source": "...", "date": "YYYY-MM-DD", "note": "..."}],
+        "citations": [{"id": "D1", "source": "...", "date": "YYYY-MM-DD", "date_accessed": None, "url": None, "note": "..."}],
         "web_sweep_sources": [{"id": "W1", "source": "...", "date": "YYYY-MM-DD", "date_accessed": "YYYY-MM-DD", "url": "https://...", "note": "..."}],
+        "evidence_sources": [], "extraction_warnings": [],
         "assessment_limitations": "...",
         "assessment_process": {"used_full_rubric": True, "performed_web_sweep": True, "reconciled_docs_with_web": True, "built_return_model": True, "notes": "Actual completion only"},
     }
@@ -526,7 +546,7 @@ def build_default_run_id() -> str:
 
 
 def _run_with_retry(runner, prompt: str, cwd: Path) -> tuple[dict[str, object] | None, str | None]:
-    """Run assistant once with a strict-JSON retry fallback on failure.
+    """Run assistant up to three times, feeding each failure into the next prompt.
     
     Args:
         runner: Value for ``runner``.
@@ -537,20 +557,34 @@ def _run_with_retry(runner, prompt: str, cwd: Path) -> tuple[dict[str, object] |
         tuple[dict[str, object] | None, str | None]: Value returned by this function.
     """
 
-    first_error: str | None = None
-    try:
-        return runner.run_assessment(prompt, cwd=cwd), None
-    except Exception as exc:  # noqa: BLE001
-        first_error = str(exc)
-        retry_prompt = (
-            f"{prompt}\n\n"
-            "RETRY INSTRUCTION: Return strict JSON only. Do not include markdown fences or extra text."
-        )
+    errors: list[str] = []
+    current_prompt = prompt
+    for attempt in range(1, 4):
         try:
-            return runner.run_assessment(retry_prompt, cwd=cwd), None
-        except Exception as retry_exc:  # noqa: BLE001
-            second_error = str(retry_exc)
-            return None, f"first_attempt={first_error}; retry_attempt={second_error}"
+            payload = runner.run_assessment(current_prompt, cwd=cwd)
+            if payload.get("schema_version") != 4:
+                raise ValueError(f"New assessments must use schema_version 4; received {payload.get('schema_version')}")
+            return payload, None
+        except Exception as exc:  # noqa: BLE001
+            error = str(exc)
+            errors.append(error)
+            if attempt < 3:
+                prior_errors = "\n".join(f"- {item}" for item in errors)
+                current_prompt = (
+                    f"{prompt}\n\n"
+                    f"RETRY {attempt}/2 VALIDATION FEEDBACK. All prior validation errors must be fixed together:\n"
+                    f"{prior_errors}\n"
+                    "Recheck the entire response against the schema, not only the latest error. In particular, "
+                    "decision.economics is one of attractive/unattractive/unknown; decision.fit is one of "
+                    "compatible/incompatible/unknown; decision.evidence is sufficient/incomplete; suggested_amount "
+                    "is numeric and exactly 0 for WAIT/PASS; issue status and evidence_state must use their listed "
+                    "enums; summary word limits still apply; return_assumptions is always an object (use {} when "
+                    "unavailable). Do not include markdown fences or extra text."
+                )
+
+    return None, "; ".join(
+        f"attempt_{index}={error}" for index, error in enumerate(errors, start=1)
+    )
 
 
 def _infer_dilution_assumption(return_scenarios: list[dict[str, object]]) -> str:

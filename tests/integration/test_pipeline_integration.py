@@ -6,7 +6,9 @@ import threading
 
 import pytest
 from angelcopilot.models import InvestorProfile
-from angelcopilot.pipeline import run_batch_assessment
+from angelcopilot.assistant import validate_assessment_payload
+from angelcopilot.pipeline import build_skill_native_prompt, run_batch_assessment
+from angelcopilot.reporting import write_batch_outputs
 
 
 class FakeRunner:
@@ -78,6 +80,117 @@ class FailingRunner:
         del prompt
         del cwd
         raise RuntimeError("intentional failure")
+
+
+class RepairingModernRunner:
+    """Simulate a structurally malformed model response followed by a retry."""
+
+    def __init__(self, defect: str) -> None:
+        self.prompts: list[str] = []
+        self.defect = defect
+
+    def run_assessment(self, prompt: str, cwd: Path) -> dict[str, object]:
+        del cwd
+        self.prompts.append(prompt)
+        payload = _modern_payload()
+        if len(self.prompts) == 1:
+            if self.defect == "return_assumptions":
+                payload["return_assumptions"] = "not an object"
+            else:
+                raise AssertionError(f"Unknown synthetic defect: {self.defect}")
+        return validate_assessment_payload(payload)
+
+
+class CumulativeRetryRunner:
+    """Exercise repeated validation repairs without a model/API call."""
+
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+
+    def run_assessment(self, prompt: str, cwd: Path) -> dict[str, object]:
+        del cwd
+        self.prompts.append(prompt)
+        if len(self.prompts) == 1:
+            raise ValueError("assessment_summary word count rejected")
+        if len(self.prompts) == 2:
+            raise ValueError("suggested_amount must be a number")
+        payload = _modern_payload()
+        return validate_assessment_payload(payload)
+
+
+class AlwaysFailingRunner:
+    """Simulate an unrecoverable generation failure and capture retry prompts."""
+
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+
+    def run_assessment(self, prompt: str, cwd: Path) -> dict[str, object]:
+        del cwd
+        self.prompts.append(prompt)
+        raise RuntimeError("synthetic CLI transport failure")
+
+
+class ShortSummaryMalformedRunner:
+    """Return style warnings and repairable recommendation fields as raw JSON."""
+
+    def run_assessment(self, prompt: str, cwd: Path) -> dict[str, object]:
+        del prompt, cwd
+        payload = _modern_payload()
+        payload["decision"]["assessment_summary"] = {
+            key: "Brief but usable summary." for key in (
+                "investment_case", "supporting_evidence", "counterarguments", "decision_logic"
+            )
+        }
+        payload["decision"]["suggested_amount"] = "not a number"
+        payload["return_assumptions"] = "not an object"
+        payload["category_drivers"]["Team"] = "decision driver " * 20
+        payload["diligence_issues"] = [{
+            "id": "I1", "priority": 1, "status": "critical", "evidence_state": "unverified",
+            "title": "Evidence gap", "finding": "The claim is not supported.",
+            "decision_impact": "It limits the current decision.",
+        }]
+        payload["questions"] = [{
+            "question": "Please provide the underlying source documents and walk through every material assumption "
+                         "used to prepare this forecast so that we can independently verify the reported figures, "
+                         "including customer schedules, signed contracts, accounting records, calculation notes, "
+                         "supporting correspondence, exclusions, adjustments, and the reconciliation to filed statements "
+                         "for the last three reporting periods.",
+            "priority": 1, "audience": "founder", "optional": False, "issue_id": "I1",
+            "evidence_requested": "Underlying source documents and forecast bridge.",
+        }]
+        return payload
+
+
+def _modern_payload() -> dict[str, object]:
+    categories = ("Team", "Market", "Product", "Traction", "Unit Economics", "Defensibility", "Terms")
+    summary = "This synthetic assessment summary gives enough context to satisfy the versioned contract. " \
+        "It describes what is known, what remains uncertain, and why the current decision follows from evidence. " \
+        "The test does not contact external services and exists to verify the assessment repair boundary."
+    return {
+        "schema_version": 2,
+        "deal_id": "deal_a",
+        "company_name": "Deal A",
+        "category_scores": {key: None for key in categories},
+        "category_rationales": {key: "Evidence is not available in this synthetic test." for key in categories},
+        "category_drivers": {key: "Insufficient evidence to support a score." for key in categories},
+        "category_confidence": {key: "unknown" for key in categories},
+        "deal_snapshot": {key: "Unknown" for key in ("product", "customer", "stage", "instrument", "terms", "market_timing")},
+        "decision": {
+            "verdict": "WAIT", "reason": "Evidence is insufficient.", "next_action": "Gather evidence.",
+            "sizing_reason": "No cheque until evidence is sufficient.", "economics": "unknown",
+            "evidence": "incomplete", "fit": "unknown", "suggested_amount": 0,
+            "assessment_summary": {key: summary for key in (
+                "investment_case", "supporting_evidence", "counterarguments", "decision_logic"
+            )},
+        },
+        "diligence_issues": [], "questions": [], "return_assumptions": {}, "return_scenarios": [],
+        "risk_flags": [], "sectors": [], "geographies": [], "rationale": "Synthetic integration fixture.",
+        "citations": [], "web_sweep_sources": [], "assessment_limitations": "Synthetic test only.",
+        "assessment_process": {
+            "used_full_rubric": False, "performed_web_sweep": False,
+            "reconciled_docs_with_web": False, "built_return_model": False,
+        },
+    }
 
 
 class ThreadTrackingRunner:
@@ -188,6 +301,124 @@ def test_run_batch_assessment__skill_native_mode_uses_skill_reference(tmp_path: 
     assert "assess the deal in " in prompt
     assert str(deal_folder) not in prompt
     assert str(profile_path) in prompt
+
+
+def test_build_skill_native_prompt__states_modern_enum_and_object_contract(tmp_path: Path) -> None:
+    prompt = build_skill_native_prompt(
+        deal_id="deal_a", deal_path=tmp_path / "deal", profile_path=tmp_path / "profile.md"
+    )
+
+    assert "decision.economics must be exactly one of `attractive`, `unattractive`, `unknown`" in prompt
+    assert "decision.fit must be exactly one of `compatible`, `incompatible`, `unknown`" in prompt
+    assert "return_assumptions must always be a JSON object" in prompt
+    assert "never use a string, array, or null for it" in prompt
+    assert "decision.suggested_amount must be a JSON number" in prompt
+    assert "evidence_state must be exactly verified/reported/unknown/conflicting" in prompt
+
+
+def test_run_batch_assessment__normalizes_malformed_return_assumptions(tmp_path: Path) -> None:
+    deals_root = tmp_path / "deals"
+    deal_folder = deals_root / "deal_a"
+    deal_folder.mkdir(parents=True)
+    (deal_folder / "memo.txt").write_text("Synthetic test evidence", encoding="utf-8")
+    runner = RepairingModernRunner("return_assumptions")
+
+    results = run_batch_assessment(
+        deals_root=deals_root,
+        since_days=7,
+        profile=InvestorProfile(sectors_themes=["AI"], geo_focus=["Europe"]),
+        runner=runner,
+        cwd=tmp_path,
+    )
+
+    assert len(results) == 1
+    assert results[0].deal_id == "deal_a"
+    assert len(runner.prompts) == 1
+    assert any("Return assumptions were malformed" in warning for warning in results[0].assessment_quality_warnings)
+    assert len(results[0].assessment_quality_warnings) == len(set(results[0].assessment_quality_warnings))
+
+
+def test_run_batch_assessment__style_and_safe_decision_fixes_do_not_block_report(tmp_path: Path) -> None:
+    deals_root = tmp_path / "deals"
+    deal_folder = deals_root / "deal_a"
+    deal_folder.mkdir(parents=True)
+    (deal_folder / "memo.txt").write_text("Synthetic test evidence", encoding="utf-8")
+
+    results = run_batch_assessment(
+        deals_root=deals_root,
+        since_days=7,
+        profile=InvestorProfile(sectors_themes=["AI"], geo_focus=["Europe"]),
+        runner=ShortSummaryMalformedRunner(),
+        cwd=tmp_path,
+    )
+
+    assert len(results) == 1
+    assessment = results[0]
+    assert assessment.decision["suggested_amount"] == 0
+    assert assessment.return_summary["status"] == "unavailable"
+    assert any("Return assumptions were malformed" in warning for warning in assessment.assessment_quality_warnings)
+    assert assessment.diligence_issues[0]["status"] == "blocker"
+    assert assessment.diligence_issues[0]["evidence_state"] == "unknown"
+    assert any("preferred total is 140–260" in warning for warning in assessment.assessment_quality_warnings)
+    assert any("Team driver exceeds the preferred 25-word limit" in warning for warning in assessment.assessment_quality_warnings)
+    assert any("exceeds the preferred 45-word limit" in warning for warning in assessment.assessment_quality_warnings)
+
+    outputs = write_batch_outputs([assessment], tmp_path / "report", run_id="quality-smoke")
+    assert outputs.markdown_path.is_file()
+    report = outputs.markdown_path.read_text(encoding="utf-8")
+    assert "Assessment Quality Notes" in report
+    assert "No cheque recommended" in report
+    assert "Team driver exceeds the preferred 25-word limit" in report
+    assert "exceeds the preferred 45-word limit" in report
+
+
+def test_run_batch_assessment__retry_feedback_accumulates_prior_errors(tmp_path: Path) -> None:
+    deals_root = tmp_path / "deals"
+    deal_folder = deals_root / "deal_a"
+    deal_folder.mkdir(parents=True)
+    (deal_folder / "memo.txt").write_text("Synthetic test evidence", encoding="utf-8")
+    runner = CumulativeRetryRunner()
+
+    results = run_batch_assessment(
+        deals_root=deals_root,
+        since_days=7,
+        profile=InvestorProfile(sectors_themes=["AI"], geo_focus=["Europe"]),
+        runner=runner,
+        cwd=tmp_path,
+    )
+
+    assert len(results) == 1
+    assert len(runner.prompts) == 3
+    assert "assessment_summary word count rejected" in runner.prompts[1]
+    assert "assessment_summary word count rejected" in runner.prompts[2]
+    assert "suggested_amount must be a number" in runner.prompts[2]
+
+
+def test_run_batch_assessment__uses_both_retries_and_reports_validation_feedback(tmp_path: Path) -> None:
+    deals_root = tmp_path / "deals"
+    deal_folder = deals_root / "deal_a"
+    deal_folder.mkdir(parents=True)
+    (deal_folder / "memo.txt").write_text("Synthetic test evidence", encoding="utf-8")
+    runner = AlwaysFailingRunner()
+    events: list[tuple[str, dict[str, object]]] = []
+
+    with pytest.raises(RuntimeError, match="No assessments completed successfully"):
+        run_batch_assessment(
+            deals_root=deals_root,
+            since_days=7,
+            profile=InvestorProfile(sectors_themes=["AI"], geo_focus=["Europe"]),
+            runner=runner,
+            cwd=tmp_path,
+            progress_callback=lambda event, payload: events.append((event, payload)),
+        )
+
+    assert len(runner.prompts) == 3
+    assert "synthetic CLI transport failure" in runner.prompts[1]
+    assert "synthetic CLI transport failure" in runner.prompts[2]
+    failed_payload = next(payload for event, payload in events if event == "deal_failed")
+    assert "attempt_1=synthetic CLI transport failure" in str(failed_payload["error"])
+    assert "attempt_2=synthetic CLI transport failure" in str(failed_payload["error"])
+    assert "attempt_3=synthetic CLI transport failure" in str(failed_payload["error"])
 
 
 def test_run_batch_assessment__emits_progress_events(tmp_path: Path) -> None:

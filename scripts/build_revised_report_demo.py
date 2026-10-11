@@ -18,6 +18,9 @@ from angelcopilot.scoring import apply_scoring_rules
 def demo_payloads() -> list[dict]:
     """Three investment outcomes at the same normal cheque; all facts are invented."""
     base = json.loads(_response_schema_template())
+    base["schema_version"] = 2
+    for key in ("assessment_mode", "screening", "economic_ranges"):
+        base.pop(key, None)
     base.update(deal_id="fictional_meridianops", company_name="Fictional MeridianOps", risk_flags=[], sectors=["B2B Software"], geographies=["Europe"])
     base["deal_snapshot"] = {
         "product": "Software that automates invoice exceptions and approvals.", "customer": "Finance teams at mid-sized logistics businesses.",

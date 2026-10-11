@@ -120,15 +120,19 @@ uv run python -m angelcopilot.cli batch run \
   --deals-root tests/fixtures/deals \
   --layout flat \
   --assistant codex \
-  --assistant-model gpt-5.5 \
-  --skill-path <path-to-installed-skill-md> \
+  --assistant-model gpt-6-luna \
   --profile .angelcopilot/profile.md \
   --out outputs \
   --parallelism 2 \
   --intake-filter rules
 ```
 
-Example `--skill-path` value:
+The default skill path points to the current repository source at
+`skills/public/angel-copilot/SKILL.md`. Pass `--skill-path` only when you want
+to use a different skill copy. To build the installable package for skill-enabled
+UIs, run `./scripts/build_skill_package.sh`; then upload or import `angel-copilot.skill`.
+
+Example installed `--skill-path` value:
 
 ```text
 ~/.codex/skills/angel-copilot/SKILL.md
@@ -167,8 +171,7 @@ uv run python -m angelcopilot.cli batch run \
   --layout syndicates \
   --since-days 7 \
   --assistant codex \
-  --assistant-model gpt-5.5 \
-  --skill-path <path-to-installed-skill-md> \
+  --assistant-model gpt-6-luna \
   --profile .angelcopilot/profile.md \
   --out outputs \
   --parallelism 2 \

@@ -7,8 +7,9 @@ import json
 import re
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
-from angelcopilot.contract import validate_modern
+from angelcopilot.contract import assessment_response_schema, validate_modern
 from angelcopilot.economics import number, validate_scenarios
 
 REQUIRED_SCORE_KEYS = (
@@ -43,17 +44,19 @@ REQUIRED_PAYLOAD_FIELDS = (
 class CodexRunner:
     """Run a single-deal assessment prompt through the Codex CLI."""
 
-    def __init__(self, model: str | None = None) -> None:
+    def __init__(self, model: str | None = None, reasoning_effort: str = "medium") -> None:
         """Initialize Codex runner.
 
         Args:
             model: Optional Codex model override. When omitted, Codex CLI config is used.
+            reasoning_effort: Codex reasoning effort (none, low, medium, high, xhigh, max).
 
         Returns:
             None.
         """
 
         self.model = _normalize_optional_text(model)
+        self.reasoning_effort = reasoning_effort
 
     def run_assessment(self, prompt: str, cwd: Path) -> dict[str, object]:
         """Execute Codex, parse JSON response, and validate payload fields.
@@ -66,8 +69,16 @@ class CodexRunner:
             Validated assessment payload.
         """
 
-        command = _build_codex_exec_command(cwd=cwd, model=self.model)
-        result = subprocess.run(command, input=prompt, capture_output=True, text=True, check=False)
+        with tempfile.TemporaryDirectory(prefix="angelcopilot-schema-") as schema_dir:
+            schema_path = Path(schema_dir) / "assessment-response.schema.json"
+            schema_path.write_text(json.dumps(assessment_response_schema()), encoding="utf-8")
+            command = _build_codex_exec_command(
+                cwd=cwd,
+                model=self.model,
+                reasoning_effort=self.reasoning_effort,
+                output_schema=schema_path,
+            )
+            result = subprocess.run(command, input=prompt, capture_output=True, text=True, check=False)
         if result.returncode != 0:
             raise RuntimeError(f"Codex assessment failed: {result.stderr.strip()}")
 
@@ -251,7 +262,7 @@ def validate_assessment_payload(payload: dict[str, object]) -> dict[str, object]
         Normalized payload with required fields and canonical value types.
     """
 
-    if payload.get("schema_version") == 2:
+    if payload.get("schema_version") in {2, 3, 4}:
         result = validate_modern(payload)
         for key in ("deal_id", "company_name"):
             if not isinstance(result.get(key), str) or not result[key].strip():
@@ -528,12 +539,19 @@ def _require_command(command: str) -> None:
     )
 
 
-def _build_codex_exec_command(cwd: Path, model: str | None = None) -> list[str]:
+def _build_codex_exec_command(
+    cwd: Path,
+    model: str | None = None,
+    reasoning_effort: str = "medium",
+    output_schema: Path | None = None,
+) -> list[str]:
     """Build a Codex exec command for prompt-driven runs.
 
     Args:
         cwd: Working directory passed to Codex.
         model: Optional Codex model override.
+        reasoning_effort: Reasoning effort passed as a Codex CLI config override.
+        output_schema: Optional JSON Schema path constraining the final response.
 
     Returns:
         Command argument list suitable for ``subprocess.run``.
@@ -543,7 +561,9 @@ def _build_codex_exec_command(cwd: Path, model: str | None = None) -> list[str]:
     normalized_model = _normalize_optional_text(model)
     if normalized_model:
         command.extend(["--model", normalized_model])
-    command.extend(["-c", "model_reasoning_effort=medium"])
+    command.extend(["-c", f"model_reasoning_effort={reasoning_effort}"])
+    if output_schema is not None:
+        command.extend(["--output-schema", str(output_schema)])
     command.extend(["--skip-git-repo-check", "-C", str(cwd), "-"])
     return command
 

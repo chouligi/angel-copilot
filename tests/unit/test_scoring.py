@@ -119,8 +119,8 @@ def test_assessment_summary_is_structured_and_sufficiently_substantive():
     with pytest.raises(ValueError,match='assessment_summary'):
         validate_assessment_payload(payload)
     payload=deepcopy(_demo.demo_payloads()[0]);payload['decision']['assessment_summary']['decision_logic']='brief answer only'
-    with pytest.raises(ValueError,match='25–80 words'):
-        validate_assessment_payload(payload)
+    normalized = validate_assessment_payload(payload)
+    assert any('25–80' in warning for warning in normalized['assessment_quality_warnings'])
 
 
 def test_no_return_case_means_no_invest():

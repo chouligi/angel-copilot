@@ -11,6 +11,7 @@ from textwrap import dedent
 
 from angelcopilot.intake import discover_recent_deals
 from angelcopilot.job import run_batch_job
+from angelcopilot.pipeline import DEFAULT_RUNTIME_SKILL_PATH
 from angelcopilot.profile import load_investor_profile
 from angelcopilot.reporting import (
     ASSESSMENTS_JSON_FILENAME,
@@ -282,8 +283,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     execution_group.add_argument(
         "--skill-path",
-        default="~/.codex/skills/angel-copilot/SKILL.md",
-        help="Path to AngelCopilot SKILL.md used by native skill invocation.",
+        default=str(DEFAULT_RUNTIME_SKILL_PATH),
+        help="Path to AngelCopilot SKILL.md (default: this repository's current skill source).",
     )
     execution_group.add_argument(
         "--profile",

@@ -129,3 +129,37 @@ def calculate_returns(
         }
     except ValueError as exc:
         return scenarios, {"status": "unavailable", "reason": str(exc)}
+
+
+def calculate_screening_sensitivity(ranges: dict[str, object]) -> dict[str, object]:
+    """Solve the distributable exit needed for a target net multiple, without a cheque or probabilities."""
+    if not ranges:
+        return {"status": "unavailable", "reason": "No supportable valuation and cost ranges were supplied."}
+    currency = ranges.get("currency")
+    if not isinstance(currency, str) or not currency.strip():
+        raise ValueError("economic_ranges.currency is required")
+    rationale = ranges.get("rationale")
+    if not isinstance(rationale, str) or not rationale.strip():
+        raise ValueError("economic_ranges.rationale must explain reported terms and assumed ranges")
+    target = number(ranges.get("target_net_multiple"), "target_net_multiple", minimum=1.01)
+    bounds = {}
+    for name in ("entry_valuation", "dilution", "fee_rate", "carry_rate"):
+        minimum = .01 if name == "entry_valuation" else 0
+        maximum = None if name == "entry_valuation" else .99
+        lo = number(ranges.get(name + "_min"), name + "_min", minimum=minimum, maximum=maximum)
+        hi = number(ranges.get(name + "_max"), name + "_max", minimum=lo, maximum=maximum)
+        bounds[name] = (lo, hi)
+    treatment, basis = ranges.get("fee_treatment"), ranges.get("carry_basis")
+    if treatment not in {"deducted", "added"} or basis not in {"deployed_capital", "total_outlay"}:
+        raise ValueError("economic_ranges requires explicit fee_treatment and carry_basis")
+    rows = []
+    for label, fraction in (("Lower required exit", 0), ("Midpoint assumptions", .5), ("Higher required exit", 1)):
+        inputs = {key: lo + (hi - lo) * fraction for key, (lo, hi) in bounds.items()}
+        deployed = 1 - inputs["fee_rate"] if treatment == "deducted" else 1 / (1 + inputs["fee_rate"])
+        capital_basis = deployed if basis == "deployed_capital" else 1
+        gross_required = (target - inputs["carry_rate"] * capital_basis) / (1 - inputs["carry_rate"])
+        required_exit = gross_required * inputs["entry_valuation"] / (deployed * (1 - inputs["dilution"]))
+        rows.append({"label": label, **inputs, "required_exit_value": required_exit})
+    return {"status": "available", "currency": currency, "target_net_multiple": target,
+            "rows": rows, "rationale": rationale,
+            "limitations": "Illustrative cap-based post-money entry; required exit is distributable equity after debt/preferences. No follow-ons, taxes or probability forecast. Ranges do not establish achievable exits or commitment readiness."}

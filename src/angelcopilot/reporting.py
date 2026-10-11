@@ -4,7 +4,7 @@ from __future__ import annotations
 import ast
 import base64
 import csv
-from dataclasses import fields
+from dataclasses import fields, replace
 from html import escape
 import json
 from pathlib import Path
@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 from urllib.parse import quote
 
 from angelcopilot.models import AssessmentResult, BatchOutputPaths, InvestorProfile
-from angelcopilot.scoring import CATEGORY_WEIGHTS, apply_scoring_rules
+from angelcopilot.scoring import CATEGORY_WEIGHTS, apply_scoring_rules, assessment_sort_key
 from angelcopilot.assistant import validate_assessment_payload
 from angelcopilot.pdf import render_pdf_with_playwright
 
@@ -27,8 +27,13 @@ DISCLAIMER = "This is for educational purposes and not financial, legal, or tax 
 
 
 def _prepared(a: AssessmentResult) -> AssessmentResult:
-    if a.schema_version == 2:
-        validate_assessment_payload(a.to_json_dict())
+    if a.schema_version in {2, 3, 4}:
+        normalized = validate_assessment_payload(a.to_json_dict())
+        allowed = {field.name for field in fields(AssessmentResult)}
+        a = replace(a, **{key: value for key, value in normalized.items() if key in allowed})
+    a.assessment_quality_warnings = list(dict.fromkeys(
+        warning for warning in a.assessment_quality_warnings if isinstance(warning, str)
+    ))
     known = {f.name for f in fields(InvestorProfile)}
     constraints = {k: v for k, v in a.investor_constraints.items() if k in known}
     if not constraints:
@@ -40,7 +45,7 @@ def write_batch_outputs(assessments: list[AssessmentResult], output_dir: Path,
                         run_id: str, include_pdf: bool = False) -> BatchOutputPaths:
     # Enforce decision invariants even when called directly or rebuilding JSON.
     assessments = [_prepared(a) for a in assessments]
-    assessments.sort(key=lambda a: ({"INVEST": 0, "WAIT": 1, "PASS": 2}[a.verdict], -(a.weighted_score or 0)))
+    assessments.sort(key=assessment_sort_key)
     run_dir = output_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     md = run_dir / MARKDOWN_REPORT_FILENAME
@@ -50,7 +55,7 @@ def write_batch_outputs(assessments: list[AssessmentResult], output_dir: Path,
     md.write_text(_render_markdown(assessments, run_id, None), encoding="utf-8")
     html.write_text(_render_html(assessments, run_id), encoding="utf-8")
     _write_csv(csv_path, assessments)
-    json_path.write_text(json.dumps({"schema_version": 2, "run_id": run_id,
+    json_path.write_text(json.dumps({"schema_version": 3, "run_id": run_id,
                                      "assessments": [a.to_json_dict() for a in assessments]}, indent=2, ensure_ascii=False, allow_nan=False), encoding="utf-8")
     pdf = run_dir / PDF_REPORT_FILENAME if include_pdf else None
     if pdf:
@@ -140,24 +145,57 @@ def _memo_blocks(a: AssessmentResult) -> list[tuple[str, object]]:
     blocks: list[tuple[str, object]] = []
     if p.get("report_note"):
         blocks.append(("note", p["report_note"]))
-    if a.schema_version != 2:
+    if a.schema_version not in {2, 3, 4}:
         blocks.append(("note", "Archived assessment rebuilt with the new layout. Research has not been refreshed; a current recommendation and ranked questions require re-assessment."))
+    company_summary = p.get("company_summary")
+    if not company_summary:
+        company_summary = str(p.get("product") or "")
+        if p.get("customer"):
+            company_summary += " Customer: " + str(p["customer"])
+        company_summary = company_summary.strip() or "A description of what the company does was not recorded in this historical artifact."
+    blocks += [("heading", "Company Overview"), ("paragraph", company_summary)]
     decision_line = f"{a.verdict} · {_money(a.recommended_investment, a.investment_currency)} now" if a.verdict == "INVEST" else f"{a.verdict} · No cheque recommended"
-    blocks += [("heading", "Decision Brief"), ("banner", decision_line),
-               ("paragraph", a.decision_reason)]
-    if a.schema_version == 2:
+    score_label = f"{_score(a.weighted_score)} / 5" if a.weighted_score is not None else "Not calculated"
+    missing_scores = [category for category in CATEGORY_ORDER if a.category_scores.get(category) is None]
+    if a.weighted_score is None:
+        score_context = "No factors could be scored."
+    elif a.score_coverage < 1:
+        excluded = ", ".join(missing_scores)
+        score_context = f"Weighted average over scored factors; {a.score_coverage:.0%} of rubric weight assessed. Unscored factors excluded, not treated as zero: {excluded}."
+    else:
+        score_context = "All rubric weight assessed."
+    score_context += " Descriptive score; not a return prediction."
+    blocks += [("heading", "Decision Brief"),
+               ("score", {"value": score_label, "coverage": f"{a.score_coverage:.0%}", "context": score_context})]
+    if a.schema_version == 4:
+        amount_text = f" · {_money(a.recommended_investment, a.investment_currency)} now" if a.verdict == "INVEST" else ""
+        blocks += [("banner", f"{a.verdict}{amount_text} · Priority: {_recommendation_priority(a).title() or '—'} · Attention: {'Yes' if a.attention_flag else 'No'}"),
+                   ("paragraph", a.decision_reason)]
+        if a.verdict != "INVEST":
+            blocks.append(("paragraph", "No cheque recommended."))
+        blocks.append(("paragraph", "Attention: " + a.attention_reason))
+    elif a.schema_version == 3:
+        blocks += [("banner", f"{a.pursuit_recommendation} · Priority: {a.pursuit_priority.title()} · Attention: {'Yes' if a.attention_flag else 'No'}"),
+                   ("paragraph", a.pursuit_reason), ("paragraph", "Attention: " + a.attention_reason),
+                   ("paragraph", f"Commitment readiness: {a.commitment_readiness}. {a.readiness_reason}")]
+        if a.assessment_mode == "commitment":
+            blocks.append(("paragraph", "Commitment decision: " + decision_line))
+    else:
+        blocks += [("banner", decision_line), ("paragraph", a.decision_reason),
+                   ("paragraph", f"Attention: {'Yes' if a.attention_flag else 'No'} · {a.attention_reason}"),
+                   ("note", "Pursuit recommendation: Not assessed in this archived framework; no new screening judgment is inferred.")]
+    if a.schema_version in {2, 3, 4}:
         blocks.append(("subheading", "Investment Case and Decision"))
         for key, label in [("investment_case", "Investment case"), ("supporting_evidence", "Evidence supporting the case"),
-                           ("counterarguments", "Counterarguments and risks"), ("decision_logic", "Why this verdict; what could change it")]:
+                           ("counterarguments", "Counterarguments and risks"), ("decision_logic", "Why this recommendation; what could change it")]:
             blocks.append(("category", (label, a.decision["assessment_summary"][key])))
     elif a.rationale:
         blocks += [("subheading", "Historical Assessment Overview"), ("paragraph", "A concise overview was not recorded in the archived artifact; see the preserved historical analysis in the appendix.")]
     blocks.append(("paragraph", "Next action: " + a.next_action))
     summary = a.return_summary
-    if summary.get("status") != "available":
+    if summary.get("status") != "available" and a.economic_sensitivity.get("status") != "available":
         blocks.append(("category", ("Return analysis unavailable", str(summary.get("reason", "A complete net return model could not be supported.")))))
     if p:
-        blocks.append(("paragraph", f"{p.get('product', '')} Customer: {p.get('customer', '')}"))
         blocks.append(("paragraph", " · ".join(str(p[k]) for k in ("stage", "instrument", "terms") if p.get(k))))
         blocks.append(("paragraph", "Market timing: " + p.get("market_timing", "Not recorded")))
         if p.get("as_of"):
@@ -174,8 +212,12 @@ def _memo_blocks(a: AssessmentResult) -> list[tuple[str, object]]:
                      a.category_confidence.get(cat, "unknown").title(), a.category_drivers.get(cat, "See category note below")])
     blocks.append(("table", (["Category", "Weight", "Score / 5", "Evidence strength", "Key driver"], rows, [19, 9, 15, 16, 39])))
     blocks.append(("note", "Evidence strength: High = key claims independently corroborated by authoritative evidence; Medium = some corroboration, with material gaps; Low = evidence is mostly reported, incomplete or conflicting; Unknown = evidence quality could not be assessed. Unknown is not a negative score."))
-    blocks.append(("note", f"Weighted quality summary: {_score(a.weighted_score)} / 5 · Score coverage: {a.score_coverage:.0%}. Scores are descriptive; no automatic verdict thresholds."))
-    if a.schema_version == 2:
+    coverage_note = ("All rubric weight is assessed." if a.score_coverage >= .999999 else
+                     "Genuinely unassessable factors are excluded from the average, not treated as zero.")
+    score_role = ("The 3.5 / 5 score is a minimum eligibility gate for PURSUE; it never authorizes a cheque." if a.schema_version in {3, 4} else
+                  "Scores are descriptive and do not determine archived recommendations.")
+    blocks.append(("note", f"Weighted score across scored factors: {_score(a.weighted_score)} / 5 · Score coverage: {a.score_coverage:.0%}. {coverage_note} {score_role}"))
+    if a.schema_version in {2, 3, 4}:
         for cat in CATEGORY_ORDER:
             blocks.append(("category", (cat, a.category_rationales.get(cat, "No assessable evidence."))))
     blocks.append(("heading", "Decision-Critical Diligence"))
@@ -183,7 +225,7 @@ def _memo_blocks(a: AssessmentResult) -> list[tuple[str, object]]:
         for issue in sorted(a.diligence_issues, key=lambda r: float(r.get("priority", 99))):
             blocks.append(("issue", issue))
     else:
-        blocks.append(("paragraph", "Decision-critical issues were not prioritized in this artifact. Re-assess before acting." if a.schema_version != 2 else "No unresolved decision-critical issues identified. See evidence limitations."))
+        blocks.append(("paragraph", "Decision-critical issues were not prioritized in this artifact. Re-assess before acting." if a.schema_version not in {2, 3, 4} else "No unresolved decision-critical issues identified. See evidence limitations."))
     blocks.append(("heading", "Top Questions for the Founder"))
     primary = sorted([q for q in a.questions if q.get("audience") == "founder" and q.get("optional") is False], key=lambda q: float(q["priority"]))
     if len(primary) > 3:
@@ -191,13 +233,23 @@ def _memo_blocks(a: AssessmentResult) -> list[tuple[str, object]]:
     for index, question in enumerate(primary, 1):
         blocks.append(("question", (index, question)))
     if not primary:
-        blocks.append(("paragraph", "Question priorities were not recorded. Historical questions are unranked in the appendix." if a.schema_version != 2 else "No additional founder questions needed now; do not fill a quota."))
+        blocks.append(("paragraph", "Question priorities were not recorded. Historical questions are unranked in the appendix." if a.schema_version not in {2, 3, 4} else "No additional founder questions needed now; do not fill a quota."))
     blocks.append(("note", "Ask only these primary questions now. A founder assurance is not verification; request the indicated evidence or a route to confirm it."))
+    if a.economic_sensitivity.get("status") == "available":
+        sensitivity = a.economic_sensitivity
+        blocks.append(("heading", "Deal Economics"))
+        blocks.append(("paragraph", f"Exit required for {sensitivity['target_net_multiple']:g}x net cash returned, using explicit valuation, fee, carry and dilution ranges. No cheque or exit probabilities are assumed."))
+        rows = [[r['label'], _money(r['entry_valuation'], sensitivity['currency']),
+                 f"{r['fee_rate']:.1%}", f"{r['carry_rate']:.0%}", f"{r['dilution']:.0%}",
+                 _money(r['required_exit_value'], sensitivity['currency'])] for r in sensitivity['rows']]
+        blocks.append(("table", (["Assumptions", "Entry valuation", "Fee", "Carry", "Dilution", "Required equity exit"], rows, [23, 20, 8, 8, 10, 31])))
+        blocks.append(("paragraph", str(sensitivity['rationale'])))
+        blocks.append(("note", str(sensitivity['limitations'])))
     if summary.get("status") != "available":
         if a.schema_version == 1 and a.return_scenarios:
             blocks.append(("note", "Archived scenario multiples are retained in the JSON, but cannot be presented as verified net returns without structured fees, dilution and ownership assumptions."))
         return blocks
-    blocks.append(("heading", "Deal Economics"))
+    blocks.append(("subheading" if a.economic_sensitivity.get("status") == "available" else "heading", "Net Outcome Stress Tests" if a.economic_sensitivity.get("status") == "available" else "Deal Economics"))
     assumptions = a.return_assumptions
     allocation = _money(a.recommended_investment, a.investment_currency) if a.verdict == "INVEST" else "No cheque recommended"
     blocks.append(("paragraph", f"Hypothetical all-in outlay: {_money(a.hypothetical_investment, a.investment_currency)}; capital deployed: {_money(float(summary['deployed_capital']), a.investment_currency)}. This is a return illustration; recommended allocation: {allocation}."))
@@ -250,7 +302,9 @@ def _appendix_blocks(a: AssessmentResult) -> list[tuple[str, object]]:
         blocks += [("heading", "Extraction Warnings")] + [("paragraph", x) for x in a.extraction_warnings]
     if a.decision_warnings:
         blocks += [("heading", "Decision Checks")] + [("paragraph", x) for x in a.decision_warnings]
-    if a.schema_version != 2:
+    if a.assessment_quality_warnings:
+        blocks += [("heading", "Assessment Quality Notes")] + [("paragraph", x) for x in a.assessment_quality_warnings]
+    if a.schema_version not in {2, 3, 4}:
         blocks += [("heading", "Archived Analysis — Not a Current Recommendation"), ("note", f"Original verdict: {a.decision.get('original_verdict', 'Not recorded')}.")]
         for cat in CATEGORY_ORDER:
             blocks.append(("category", (cat, a.category_rationales.get(cat, "Not recorded."))))
@@ -274,7 +328,11 @@ def _block_html(block: tuple[str, object], a: AssessmentResult) -> str:
     if kind in {"heading", "subheading"}:
         tag = "h3" if kind == "heading" else "h4"
         return f"<{tag}>{t(data)}</{tag}>"
-    if kind in {"paragraph", "note", "banner"}:
+    if kind in {"paragraph", "note", "banner", "score"}:
+        if kind == "score":
+            return (f"<div class='score-summary'><span class='score-label'>Weighted score</span>"
+                    f"<strong class='score-value'>{t(data['value'])}</strong>"
+                    f"<span class='score-context'>Score coverage: {t(data['coverage'])} · {t(data['context'])}</span></div>")
         return f"<p class='{kind}'>{t(data)}</p>"
     if kind == "category":
         label, text = data
@@ -283,14 +341,18 @@ def _block_html(block: tuple[str, object], a: AssessmentResult) -> str:
         headers, rows, widths = data
         cols = ''.join(f"<col style='width:{width}%'>" for width in widths)
         head = ''.join(f"<th>{escape(h)}</th>" for h in headers)
-        body = ''.join('<tr>' + ''.join(f"<td>{t(cell)}</td>" for cell in row) + '</tr>' for row in rows)
+        body = ''.join('<tr>' + ''.join(
+            f"<td class='score-cell'><strong>{t(cell)}</strong></td>" if header == "Weighted score / 5"
+            else f"<td>{t(cell)}</td>"
+            for header, cell in zip(headers, row)
+        ) + '</tr>' for row in rows)
         return f"<table><colgroup>{cols}</colgroup><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
     if kind == "issue":
         item = data
         refs = ' '.join(f"[{ref}]" for ref in item.get("source_ids", []))
         return (f"<div class='issue'><h4>{t(item['id'])} · {t(item['title'])} <span class='status'>{t(item['status'])}</span></h4>"
                 f"<p>{t(item['finding'])} {t(refs)}</p><p><strong>Decision impact:</strong> {t(item['decision_impact'])}</p>"
-                f"<p><strong>Evidence needed:</strong> {t(item.get('evidence_needed', 'Not required now'))}</p>"
+                f"<p><strong>Evidence needed:</strong> {t(item.get('evidence_needed', 'Not required now'))}</p><p class='note'>Resolution: {t(item.get('resolution_type', 'Not recorded'))} · {t(item.get('resolution_horizon', 'Not recorded'))}</p>"
                 f"<p><strong>Reassessment trigger:</strong> {t(item.get('reconsideration_condition', 'Monitor if circumstances change'))}</p></div>")
     if kind == "question":
         index, q = data
@@ -319,15 +381,22 @@ def _block_md(block: tuple[str, object], a: AssessmentResult) -> str:
     if kind == "heading": return '#### ' + _md_text(data)
     if kind == "subheading": return '##### ' + _md_text(data)
     if kind in {"paragraph", "note"}: return _md_text(data)
+    if kind == "score":
+        return f"**Weighted score: {_md_text(data['value'])}**\n\nScore coverage: {_md_text(data['coverage'])} · {_md_text(data['context'])}"
     if kind == "banner": return '**' + _md_text(data) + '**'
     if kind == "category": return f"**{_md_text(data[0])}.** {_md_text(data[1])}"
     if kind == "table":
         headers, rows, _ = data
-        return '\n'.join(['| ' + ' | '.join(headers) + ' |', '| ' + ' | '.join('---' for _ in headers) + ' |'] + ['| ' + ' | '.join(_md_cell(x) for x in row) + ' |' for row in rows])
+        rendered_rows = []
+        for row in rows:
+            cells = [f"**{_md_cell(cell)}**" if header == "Weighted score / 5" else _md_cell(cell)
+                     for header, cell in zip(headers, row)]
+            rendered_rows.append('| ' + ' | '.join(cells) + ' |')
+        return '\n'.join(['| ' + ' | '.join(headers) + ' |', '| ' + ' | '.join('---' for _ in headers) + ' |', *rendered_rows])
     if kind == "issue":
         i = data
         refs = ' '.join('[' + _md_text(s) + ']' for s in i.get('source_ids', []))
-        return f"**{_md_text(i['id'])} · {_md_text(i['title'])} ({_md_text(i['status'])})**\n\n{_md_text(i['finding'])} {refs}\n\nDecision impact: {_md_text(i['decision_impact'])}\n\nEvidence needed: {_md_text(i.get('evidence_needed', 'Not required now'))}\n\nReassessment trigger: {_md_text(i.get('reconsideration_condition', 'Monitor if circumstances change'))}"
+        return f"**{_md_text(i['id'])} · {_md_text(i['title'])} ({_md_text(i['status'])})**\n\n{_md_text(i['finding'])} {refs}\n\nDecision impact: {_md_text(i['decision_impact'])}\n\nEvidence needed: {_md_text(i.get('evidence_needed', 'Not required now'))}\n\nResolution: {_md_text(i.get('resolution_type', 'Not recorded'))} · {_md_text(i.get('resolution_horizon', 'Not recorded'))}\n\nReassessment trigger: {_md_text(i.get('reconsideration_condition', 'Monitor if circumstances change'))}"
     if kind == "question":
         index, q = data
         return f"{index}. **{_md_text(q['question'])}**\n\nEvidence: {_md_text(q['evidence_requested'])} · Linked issue {_md_text(q['issue_id'])}"
@@ -340,15 +409,44 @@ def _block_md(block: tuple[str, object], a: AssessmentResult) -> str:
     raise ValueError(f"Unknown report block {kind}")
 
 
+OVERVIEW_HEADERS = ["Company", "Weighted score / 5", "Coverage", "Recommendation / Priority", "Attention", "Decisive reason", "Next action"]
+OVERVIEW_WIDTHS = [15, 10, 7, 16, 7, 24, 21]
+
+
 def _overview(assessments: list[AssessmentResult]) -> list[list[str]]:
-    return [[a.company_name, a.verdict, _cheque_now(a), a.decision_reason, a.next_action] for a in assessments]
+    rows = []
+    for a in assessments:
+        action = a.verdict if a.schema_version == 4 else a.pursuit_recommendation or a.verdict or "Not assessed"
+        priority = _recommendation_priority(a).title()
+        decisive = a.decision_reason if a.schema_version == 4 else a.pursuit_reason or a.decision_reason
+        rows.append([a.company_name, f"{_score(a.weighted_score)} / 5" if a.weighted_score is not None else "Not calculated",
+                     f"{a.score_coverage:.0%}", f"{action}" + (f" / {priority}" if priority else ""),
+                     "Yes" if a.attention_flag else "No", decisive, a.next_action])
+    return rows
+
+
+def _recommendation_priority(a: AssessmentResult) -> str:
+    """Return current decision priority, falling back to the legacy derived field."""
+    if a.schema_version == 4:
+        return str(a.decision.get("priority", a.pursuit_priority))
+    return a.pursuit_priority
+
+
+def _counts(assessments: list[AssessmentResult], separator: str) -> str:
+    if any(a.schema_version == 4 for a in assessments):
+        counts = separator.join(f"{sum(a.schema_version == 4 and a.verdict == v for a in assessments)} {v}" for v in ("INVEST", "PURSUE", "WAIT", "PASS"))
+        archived = sum(a.schema_version < 4 for a in assessments)
+    else:
+        counts = separator.join(f"{sum(a.pursuit_recommendation == v for a in assessments)} {v}" for v in ("PURSUE", "CONSIDER", "PASS"))
+        archived = sum(a.schema_version != 3 for a in assessments)
+    return counts + (f"{separator}{archived} archived assessments retain historical labels" if archived else "")
 
 
 def _render_markdown(assessments: list[AssessmentResult], run_id: str, logo_markdown_path: str | None) -> str:
-    counts = ', '.join(f"{sum(a.verdict == v for a in assessments)} {v}" for v in ('INVEST', 'WAIT', 'PASS'))
+    counts = _counts(assessments, ', ')
     lines = ['# AngelCopilot Investment Decisions', f'Run: {run_id} · {len(assessments)} deals · {counts}', '## Executive Overview']
     if assessments:
-        lines.append(_block_md(("table", (["Company", "Decision", "Cheque now", "Decisive reason", "Next action"], _overview(assessments), [])), assessments[0]))
+        lines.append(_block_md(("table", (OVERVIEW_HEADERS, _overview(assessments), OVERVIEW_WIDTHS)), assessments[0]))
     else: lines.append('No assessments completed in this run.')
     lines.append('## Individual Assessments')
     for i, a in enumerate(assessments, 1):
@@ -369,10 +467,11 @@ CSS = """
 .logo{width:58px;height:58px;object-fit:contain}h1{font-size:26px;line-height:1.2;margin:0 0 8px;color:#14243a}h2{font-size:22px;line-height:1.3;margin:0 0 20px}
 h3{font-size:15px;color:#175e68;margin:24px 0 10px;break-after:avoid}h4{font-size:13px;margin:12px 0 5px;break-after:avoid}p{margin:7px 0;orphans:3;widows:3}
 .banner{font-size:19px;font-weight:700;padding:13px 16px;border-left:4px solid #267b86;background:#eef6f5;break-inside:avoid}.note{font-size:11px;color:#59697b}.category{margin:10px 0}
-table{border-collapse:collapse;table-layout:fixed;width:100%;margin:12px 0 16px;font-size:11px}th{text-align:left;padding:9px 7px;background:#203047;color:white;font-weight:600}td{padding:9px 7px;vertical-align:top;border-bottom:1px solid #dce3ea;overflow-wrap:anywhere}tr{break-inside:avoid}thead{display:table-header-group}
+table{border-collapse:collapse;table-layout:fixed;width:100%;margin:12px 0 16px;font-size:11px}th{text-align:left;padding:9px 7px;background:#203047;color:white;font-weight:600}td{padding:9px 7px;vertical-align:top;border-bottom:1px solid #dce3ea;overflow-wrap:anywhere}.score-cell{font-size:13px;font-weight:700;color:#175e68;background:#eef6f5}tr{break-inside:avoid}thead{display:table-header-group}
+.score-summary{display:block;margin:5px 0 16px;padding:18px 20px;border-left:5px solid #267b86;background:#eef6f5;color:#175e68;break-inside:avoid}.score-label{display:block;font-size:12px;font-weight:600}.score-value{display:block;font-size:40px;line-height:1.15;font-weight:800;margin:5px 0 8px;letter-spacing:-.5px}.score-context{display:block;font-size:11px;font-weight:400;color:#59697b}
 a{color:#175e68;text-decoration:underline;text-underline-offset:2px}.citation{font-size:10px}.issue{border-left:2px solid #d6e6e8;padding-left:14px;margin:15px 0;break-inside:avoid}.status{font-weight:400;font-size:10px;text-transform:uppercase;color:#637389}
 .question,.source{break-inside:avoid;margin:10px 0 15px}.source p{margin:4px 0}.appendix{font-size:12px}nav a{display:block;margin:5px 0}.footer{margin:20px auto;max-width:1080px;padding:0 30px;font-size:11px;color:#59697b}
-@page{size:A4;margin:17mm 14mm 18mm}@media print{body{background:white;font-size:10.5pt;line-height:1.4}.page{padding:0;margin:0;border-radius:0;box-shadow:none;max-width:none}.company,.appendix{break-before:page}h1{font-size:23pt}h2{font-size:19pt}h3{font-size:12pt}h4{font-size:10.5pt}.note{font-size:8.5pt}table{font-size:8pt}th,td{padding:6px 5px}.banner{font-size:14pt}.footer{break-inside:avoid}a{color:inherit}.header{margin-bottom:16px}}
+@page{size:A4;margin:17mm 14mm 18mm}@media print{body{background:white;font-size:10.5pt;line-height:1.4}.page{padding:0;margin:0;border-radius:0;box-shadow:none;max-width:none}.company,.appendix{break-before:page}h1{font-size:23pt}h2{font-size:19pt}h3{font-size:12pt}h4{font-size:10.5pt}.note{font-size:8.5pt}table{font-size:8pt}th,td{padding:6px 5px}.banner{font-size:14pt}.score-value{font-size:28pt}.score-label{font-size:9pt}.score-context{font-size:8.5pt}.score-summary{padding:12px 16px}.footer{break-inside:avoid}a{color:inherit}.header{margin-bottom:16px}}
 """
 
 
@@ -383,10 +482,10 @@ def _render_html(assessments: list[AssessmentResult], run_id: str) -> str:
         logo = "<img class='logo' alt='AngelCopilot' src='data:image/png;base64," + base64.b64encode(logo_path.read_bytes()).decode() + "'>"
     parts = ["<!doctype html><html lang='en'><head><meta charset='utf-8'><title>AngelCopilot Investment Decisions</title><style>" + CSS + "</style></head><body>",
              f"<section class='page'><div class='header'><div><h1>AngelCopilot Investment Decisions</h1><p class='note'>Run: {escape(run_id)} · {len(assessments)} deals</p></div>{logo}</div><h2>Executive Overview</h2>"]
-    counts = ' · '.join(f"{sum(a.verdict == v for a in assessments)} {v}" for v in ('INVEST', 'WAIT', 'PASS'))
+    counts = _counts(assessments, ' · ')
     parts.append(f"<p>{counts}</p>")
     if assessments:
-        parts.append(_block_html(("table", (["Company", "Decision", "Cheque now", "Decisive reason", "Next action"], _overview(assessments), [19, 10, 12, 35, 24])), assessments[0]))
+        parts.append(_block_html(("table", (OVERVIEW_HEADERS, _overview(assessments), OVERVIEW_WIDTHS)), assessments[0]))
         parts.append("<nav><h3>Contents</h3>" + ''.join(f"<a href='#memo-{_slug(a.deal_id)}'>{escape(a.company_name)} · Decision memo</a>" for a in assessments) + "<a href='#evidence'>Evidence appendix</a></nav>")
     else:
         parts.append('<p>No assessments completed in this run.</p>')
@@ -405,10 +504,19 @@ def _render_html(assessments: list[AssessmentResult], run_id: str) -> str:
 
 def _write_csv(path: Path, assessments: list[AssessmentResult]) -> None:
     with path.open('w', newline='', encoding='utf-8') as handle:
-        writer = csv.DictWriter(handle, fieldnames=['deal_id', 'company_name', 'weighted_score', 'score_coverage', 'verdict', 'recommended_investment', 'investment_currency', 'decision_reason', 'next_action'])
+        writer = csv.DictWriter(handle, fieldnames=['deal_id', 'company_name', 'schema_version', 'weighted_score', 'score_coverage', 'recommendation', 'priority', 'attention_flag', 'attention_reason', 'recommended_investment', 'investment_currency', 'recommendation_reason', 'next_action'])
         writer.writeheader()
         for a in assessments:
-            row = {k: getattr(a, k) for k in writer.fieldnames}
+            row = {
+                'deal_id': a.deal_id, 'company_name': a.company_name, 'schema_version': a.schema_version,
+                'weighted_score': a.weighted_score, 'score_coverage': a.score_coverage,
+                'recommendation': a.verdict if a.schema_version == 4 else a.pursuit_recommendation or a.verdict,
+                'priority': _recommendation_priority(a), 'attention_flag': a.attention_flag,
+                'attention_reason': a.attention_reason, 'recommended_investment': a.recommended_investment,
+                'investment_currency': a.investment_currency,
+                'recommendation_reason': a.decision_reason if a.schema_version == 4 else a.pursuit_reason or a.decision_reason,
+                'next_action': a.next_action,
+            }
             if a.verdict != "INVEST":
                 row["recommended_investment"] = ""
             writer.writerow(row)
