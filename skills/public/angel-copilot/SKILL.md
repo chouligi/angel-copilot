@@ -2,7 +2,7 @@
 name: angel-copilot
 description: Educational angel investing assistant for investor profile onboarding/loading, allocation planning, startup deal assessment using a 7-factor weighted rubric and return modeling, due diligence checklists, and angel-investing term explanations. Use when users ask to create/load a profile, suggest allocations, assess a startup, generate a due diligence checklist, or research a deal (web-sweep) before scoring.
 metadata:
-  version: "0.2.0"
+  version: "0.2.1"
 ---
 
 # Angel Copilot
