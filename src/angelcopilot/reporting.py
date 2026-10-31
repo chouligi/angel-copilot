@@ -169,20 +169,20 @@ def _memo_blocks(a: AssessmentResult) -> list[tuple[str, object]]:
                ("score", {"value": score_label, "coverage": f"{a.score_coverage:.0%}", "context": score_context})]
     if a.schema_version == 4:
         amount_text = f" · {_money(a.recommended_investment, a.investment_currency)} now" if a.verdict == "INVEST" else ""
-        blocks += [("banner", f"{a.verdict}{amount_text} · Priority: {_recommendation_priority(a).title() or '—'} · Attention: {'Yes' if a.attention_flag else 'No'}"),
+        blocks += [("banner", f"{a.verdict}{amount_text} · Priority: {_recommendation_priority(a).title() or '—'} · Priority follow-up: {'Yes' if a.attention_flag else 'No'}"),
                    ("paragraph", a.decision_reason)]
         if a.verdict != "INVEST":
             blocks.append(("paragraph", "No cheque recommended."))
-        blocks.append(("paragraph", "Attention: " + a.attention_reason))
+        blocks.append(("paragraph", "Priority follow-up: " + a.attention_reason))
     elif a.schema_version == 3:
-        blocks += [("banner", f"{a.pursuit_recommendation} · Priority: {a.pursuit_priority.title()} · Attention: {'Yes' if a.attention_flag else 'No'}"),
-                   ("paragraph", a.pursuit_reason), ("paragraph", "Attention: " + a.attention_reason),
+        blocks += [("banner", f"{a.pursuit_recommendation} · Priority: {a.pursuit_priority.title()} · Priority follow-up: {'Yes' if a.attention_flag else 'No'}"),
+                   ("paragraph", a.pursuit_reason), ("paragraph", "Priority follow-up: " + a.attention_reason),
                    ("paragraph", f"Commitment readiness: {a.commitment_readiness}. {a.readiness_reason}")]
         if a.assessment_mode == "commitment":
             blocks.append(("paragraph", "Commitment decision: " + decision_line))
     else:
         blocks += [("banner", decision_line), ("paragraph", a.decision_reason),
-                   ("paragraph", f"Attention: {'Yes' if a.attention_flag else 'No'} · {a.attention_reason}"),
+                   ("paragraph", f"Priority follow-up: {'Yes' if a.attention_flag else 'No'} · {a.attention_reason}"),
                    ("note", "Pursuit recommendation: Not assessed in this archived framework; no new screening judgment is inferred.")]
     if a.schema_version in {2, 3, 4}:
         blocks.append(("subheading", "Investment Case and Decision"))
@@ -409,8 +409,9 @@ def _block_md(block: tuple[str, object], a: AssessmentResult) -> str:
     raise ValueError(f"Unknown report block {kind}")
 
 
-OVERVIEW_HEADERS = ["Company", "Weighted score / 5", "Coverage", "Recommendation / Priority", "Attention", "Decisive reason", "Next action"]
-OVERVIEW_WIDTHS = [15, 10, 7, 16, 7, 24, 21]
+OVERVIEW_HEADERS = ["Company", "Weighted score / 5", "Coverage", "Recommendation / Priority", "Priority follow-up", "Decisive reason", "Next action"]
+OVERVIEW_WIDTHS = [14, 10, 9, 16, 10, 22, 19]
+OVERVIEW_NOTE = "Ordered by recommendation, then follow-up priority, evidence strength and score. Priority follow-up highlights INVEST and high-priority PURSUE; medium-priority PURSUE still merits diligence."
 
 
 def _overview(assessments: list[AssessmentResult]) -> list[list[str]]:
@@ -444,7 +445,7 @@ def _counts(assessments: list[AssessmentResult], separator: str) -> str:
 
 def _render_markdown(assessments: list[AssessmentResult], run_id: str, logo_markdown_path: str | None) -> str:
     counts = _counts(assessments, ', ')
-    lines = ['# AngelCopilot Investment Decisions', f'Run: {run_id} · {len(assessments)} deals · {counts}', '## Executive Overview']
+    lines = ['# AngelCopilot Investment Decisions', f'Run: {run_id} · {len(assessments)} deals · {counts}', '## Executive Overview', OVERVIEW_NOTE]
     if assessments:
         lines.append(_block_md(("table", (OVERVIEW_HEADERS, _overview(assessments), OVERVIEW_WIDTHS)), assessments[0]))
     else: lines.append('No assessments completed in this run.')
@@ -463,11 +464,11 @@ def _render_markdown(assessments: list[AssessmentResult], run_id: str, logo_mark
 CSS = """
 *{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#203047;background:#eef1f5;margin:0;font-size:13px;line-height:1.5}
 .page{background:white;max-width:1080px;margin:24px auto;padding:36px 46px;border-radius:10px;box-shadow:0 4px 24px #18243a0b}
-.header{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #267b86;padding-bottom:16px;margin-bottom:20px}
-.logo{width:58px;height:58px;object-fit:contain}h1{font-size:26px;line-height:1.2;margin:0 0 8px;color:#14243a}h2{font-size:22px;line-height:1.3;margin:0 0 20px}
+.header{display:flex;justify-content:space-between;align-items:center;gap:20px;border-bottom:3px solid #267b86;padding-bottom:16px;margin-bottom:20px}
+.header>div{min-width:0;overflow-wrap:anywhere}.logo{flex-shrink:0;width:58px;height:58px;object-fit:contain}h1{font-size:26px;line-height:1.2;margin:0 0 8px;color:#14243a}h2{font-size:22px;line-height:1.3;margin:0 0 20px}
 h3{font-size:15px;color:#175e68;margin:24px 0 10px;break-after:avoid}h4{font-size:13px;margin:12px 0 5px;break-after:avoid}p{margin:7px 0;orphans:3;widows:3}
 .banner{font-size:19px;font-weight:700;padding:13px 16px;border-left:4px solid #267b86;background:#eef6f5;break-inside:avoid}.note{font-size:11px;color:#59697b}.category{margin:10px 0}
-table{border-collapse:collapse;table-layout:fixed;width:100%;margin:12px 0 16px;font-size:11px}th{text-align:left;padding:9px 7px;background:#203047;color:white;font-weight:600}td{padding:9px 7px;vertical-align:top;border-bottom:1px solid #dce3ea;overflow-wrap:anywhere}.score-cell{font-size:13px;font-weight:700;color:#175e68;background:#eef6f5}tr{break-inside:avoid}thead{display:table-header-group}
+table{border-collapse:collapse;table-layout:fixed;width:100%;margin:12px 0 16px;font-size:11px}th{text-align:left;padding:9px 7px;background:#203047;color:white;font-weight:600;vertical-align:top;overflow-wrap:anywhere;word-break:normal;line-height:1.35}td{padding:9px 7px;vertical-align:top;border-bottom:1px solid #dce3ea;overflow-wrap:anywhere}.score-cell{font-size:13px;font-weight:700;color:#175e68;background:#eef6f5}tr{break-inside:avoid}thead{display:table-header-group}
 .score-summary{display:block;margin:5px 0 16px;padding:18px 20px;border-left:5px solid #267b86;background:#eef6f5;color:#175e68;break-inside:avoid}.score-label{display:block;font-size:12px;font-weight:600}.score-value{display:block;font-size:40px;line-height:1.15;font-weight:800;margin:5px 0 8px;letter-spacing:-.5px}.score-context{display:block;font-size:11px;font-weight:400;color:#59697b}
 a{color:#175e68;text-decoration:underline;text-underline-offset:2px}.citation{font-size:10px}.issue{border-left:2px solid #d6e6e8;padding-left:14px;margin:15px 0;break-inside:avoid}.status{font-weight:400;font-size:10px;text-transform:uppercase;color:#637389}
 .question,.source{break-inside:avoid;margin:10px 0 15px}.source p{margin:4px 0}.appendix{font-size:12px}nav a{display:block;margin:5px 0}.footer{margin:20px auto;max-width:1080px;padding:0 30px;font-size:11px;color:#59697b}
@@ -481,7 +482,7 @@ def _render_html(assessments: list[AssessmentResult], run_id: str) -> str:
     if logo_path.exists():
         logo = "<img class='logo' alt='AngelCopilot' src='data:image/png;base64," + base64.b64encode(logo_path.read_bytes()).decode() + "'>"
     parts = ["<!doctype html><html lang='en'><head><meta charset='utf-8'><title>AngelCopilot Investment Decisions</title><style>" + CSS + "</style></head><body>",
-             f"<section class='page'><div class='header'><div><h1>AngelCopilot Investment Decisions</h1><p class='note'>Run: {escape(run_id)} · {len(assessments)} deals</p></div>{logo}</div><h2>Executive Overview</h2>"]
+             f"<section class='page'><div class='header'><div><h1>AngelCopilot Investment Decisions</h1><p class='note'>Run: {escape(run_id)} · {len(assessments)} deals</p></div>{logo}</div><h2>Executive Overview</h2><p class='note'>{escape(OVERVIEW_NOTE)}</p>"]
     counts = _counts(assessments, ' · ')
     parts.append(f"<p>{counts}</p>")
     if assessments:

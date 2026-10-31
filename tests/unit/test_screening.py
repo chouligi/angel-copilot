@@ -251,7 +251,7 @@ def test_reports_share_opening_labels_attention_and_roundtrip(tmp_path, monkeypa
         assert report.count(summary.removesuffix(' [D1]')) == 1
     assert md.index('**Weighted score:') < md.index('**PURSUE')
     assert html.index("class='score-summary'") < html.index('PURSUE · Priority:')
-    for label in ('PURSUE', 'Attention', 'Commitment readiness', 'Evidence strength', 'Required equity exit'):
+    for label in ('PURSUE', 'Priority follow-up', 'Commitment readiness', 'Evidence strength', 'Required equity exit'):
         assert label in md and label in html
     assert 'Confidence' not in md and 'Conditional investment view' not in md
     assert a.screening['next_action'] in md and a.screening['next_action'] in html
@@ -349,3 +349,26 @@ def test_cli_rejects_removed_assessment_mode_selector():
     from angelcopilot import cli
     with pytest.raises(SystemExit):
         cli.main(['batch','run','--deals-root','/tmp/deals','--assessment-mode','commitment','--no-pdf'])
+
+
+@pytest.mark.parametrize("version", [3, 4])
+def test_high_priority_pursue_precedes_medium_with_stronger_evidence_and_score(version):
+    high = revised(priority='high')
+    medium = revised(priority='medium')
+    high.category_scores = {key: 3.6 for key in high.category_scores}
+    high.category_confidence = {key: 'low' for key in high.category_scores}
+    medium.category_scores = {key: 4.5 for key in medium.category_scores}
+    medium.category_confidence = {key: 'high' for key in medium.category_scores}
+    if version == 4:
+        from tests.assessment_payloads import as_v4
+        high = AssessmentResult(**as_v4(high.to_json_dict()))
+        medium = AssessmentResult(**as_v4(medium.to_json_dict()))
+        high.decision.update(verdict='PURSUE', priority='high')
+        medium.decision.update(verdict='PURSUE', priority='medium')
+        high.category_confidence = {key: 'low' for key in high.category_scores}
+        medium.category_confidence = {key: 'high' for key in medium.category_scores}
+    high = apply_scoring_rules(high, investor())
+    medium = apply_scoring_rules(medium, investor())
+    assert high.attention_flag and not medium.attention_flag
+    assert medium.attention_reason == 'Worth pursuing; medium-priority follow-up.'
+    assert sorted([medium, high], key=assessment_sort_key) == [high, medium]

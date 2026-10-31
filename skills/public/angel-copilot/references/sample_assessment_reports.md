@@ -14,11 +14,11 @@ Northstar Robotics develops industrial inspection robots for food manufacturers.
 
 Score coverage: 100% · Provisional Unit Economics judgment reflects the capital-heavy deployment model; Low evidence strength reflects missing cost and margin validation. Descriptive score; not a return prediction.
 
-**PURSUE · Priority: High · Attention: Yes**
+**PURSUE · Priority: High · Priority follow-up: Yes**
 
 A focused inspection product, relevant founders and promising paid-pilot signals justify a founder meeting at the stated price. The unanswered production-cost question materially affects the investment case, so prioritize it before expanding diligence.
 
-Attention: High-priority PURSUE; a coherent customer problem and early use justify focused follow-up.
+Priority follow-up: High-priority PURSUE; a coherent customer problem and early use justify focused follow-up.
 
 Commitment readiness: Diligence required. Fully loaded delivered economics and repeat-order evidence need verification.
 

@@ -6,6 +6,10 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- Reports label the highlight as Priority follow-up and explain that medium-priority PURSUE still merits diligence.
+- Batch reports rank by recommendation, then follow-up priority, evidence strength and score, so medium-priority opportunities no longer precede high-priority opportunities with the same recommendation.
+- HTML and PDF table headers wrap within adjusted column widths; report title and logo spacing also accommodates narrow layouts.
+
 - A version 4 INVEST now requires an explicit positive cheque amount. Zero-amount recommendations downgrade to WAIT and cannot fall back to the investor's typical ticket.
 - Assessments now give one action recommendation: INVEST / PURSUE / WAIT / PASS. INVEST means a supported cheque now; PURSUE means prioritize diligence; WAIT means defer active work until a stated trigger; PASS means stop at current terms or for this investor.
 - Schema version 4 removes the screening/commitment mode split and the separate verdicts. Saved version 1/2/3 assessments remain readable with their original meanings.

@@ -233,8 +233,10 @@ def apply_scoring_rules(assessment: AssessmentResult, profile: InvestorProfile) 
         "INVEST recommendation." if unified and verdict == "INVEST" else "High-priority PURSUE recommendation." if unified else
         "Ready to commit." if verdict == "INVEST" else "Strong WAIT: score >= 3.9 and profile fit >= 0.5.") if attention else (
         "Archived record: pursuit priority was not assessed." if not modern else
-        "No follow-up attention: the opportunity is declined or blocked by a hard risk." if not eligible_attention else
-        "Below the follow-up attention threshold.")
+        "Priority follow-up excluded: the opportunity is declined, has an unresolved hard risk or conflicts with investor constraints." if not eligible_attention else
+        "Worth pursuing; medium-priority follow-up." if pursuit == "PURSUE" and priority == "medium" else
+        "Monitor the stated trigger before further diligence." if verdict == "WAIT" else
+        "Follow the stated next action at the assigned priority.")
     if revised:
         decision.update({"proposed_verdict": decision.get("proposed_verdict", decision.get("verdict", verdict)),
                          "proposed_amount": decision.get("proposed_amount", suggested),
@@ -335,11 +337,12 @@ def _normalize_match_text(value: str) -> str:
 
 
 def assessment_sort_key(assessment: AssessmentResult) -> tuple:
-    """Recommended action leads; evidence strength and score support the ranking."""
+    """Rank by action, follow-up priority, evidence strength, then score."""
     if assessment.schema_version == 4:
         strength = {"high": 3, "medium": 2, "low": 1, "unknown": 0}
         evidence = sum(strength.get(v, 0) for v in assessment.category_confidence.values()) / 7
         return ({"INVEST": 0, "PURSUE": 1, "WAIT": 2, "PASS": 3}.get(assessment.verdict, 4),
+                {"high": 0, "medium": 1, "low": 2}.get(str(assessment.decision.get("priority", assessment.pursuit_priority)), 3),
                 -evidence, -(assessment.weighted_score or 0), assessment.company_name)
     if assessment.schema_version == 3:
         strength = {"high": 3, "medium": 2, "low": 1, "unknown": 0}

@@ -40,7 +40,7 @@ Best for screening multiple startups and deciding where to spend time.
 - Gives one action recommendation: INVEST / PURSUE / WAIT / PASS
 - Uses PURSUE when diligence is worth doing, WAIT when a named trigger is needed before spending time, and PASS when work should stop at current terms
 - Recommends INVEST only when diligence, economics, investor fit and cheque constraints support a normal cheque
-- Highlights INVEST and high-priority PURSUE opportunities with an attention flag
+- Highlights INVEST and high-priority PURSUE opportunities with a priority follow-up flag
 - Separates Evidence strength from factor scores and supports economics sensitivities without a personal ticket range
 - Produces a comparative report you can review or share
 
